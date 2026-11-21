@@ -216,19 +216,9 @@ public class SetupService extends Service {
         Io.chmod(new File(rt, "run-ide.sh").getPath(), 0755);
         LogBus.append("[运行时] loader=" + new File(rt, "loader").length() + "B proot=" + new File(rt, "proot").length() + "B");
 
-        // 生成的 vmoptions 片段
-        StringBuilder vm = new StringBuilder();
-        vm.append("\n-Xmx").append(Prefs.heapMb(this)).append("m\n");
-        vm.append("-XX:ReservedCodeCacheSize=256m\n");
-        vm.append("-XX:MaxMetaspaceSize=512m\n");
-        vm.append("-Dide.browser.jcef.enabled=false\n");
-        vm.append("-Didea.initially.ask.config=false\n");
-        vm.append("-Dnosplash=true\n");
-        vm.append("-Dsun.java2d.opengl=false\n");
-        java.io.FileOutputStream fos = new java.io.FileOutputStream(new File(rt, "vmoptions.txt"));
-        fos.write(vm.toString().getBytes("UTF-8"));
-        fos.close();
-        LogBus.append("[运行时] proot 已部署");
+        // 生成的 vmoptions 片段（受管块，重复写入不会产生重复 -Xmx）
+        HeapConfig.writeVmoptions(this);
+        LogBus.append("[运行时] proot 已部署 · 堆 " + Prefs.heapMb(this) + " MB");
     }
 
     private void ensureRootfs() throws Exception {
@@ -391,9 +381,9 @@ public class SetupService extends Service {
 
     private void configureIde(boolean ideOnly, String version) throws Exception {
         step("写入运行参数", ideOnly ? 90 : 88);
+        HeapConfig.applyToRootfs(this);
         Proot.run(this,
-                "cat /opt/host/vmoptions.txt >> /opt/pycharm/bin/pycharm64.vmoptions 2>/dev/null; "
-                        + "grep -q 'ide.no.platform.update' /opt/pycharm/bin/idea.properties || echo 'ide.no.platform.update=true' >> /opt/pycharm/bin/idea.properties; "
+                "grep -q 'ide.no.platform.update' /opt/pycharm/bin/idea.properties || echo 'ide.no.platform.update=true' >> /opt/pycharm/bin/idea.properties; "
                         + "chmod +x /opt/pycharm/bin/pycharm.sh");
         Io.writeText(Dirs.ideVersionMark(this), version);
         step("准备就绪", ideOnly ? 96 : 96);

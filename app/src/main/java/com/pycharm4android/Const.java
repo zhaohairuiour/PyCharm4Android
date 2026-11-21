@@ -4,7 +4,7 @@ package com.pycharm4android;
 public final class Const {
     public static final String PKG = "com.pycharm4android";
     /** 与 build.gradle.kts 的 versionName 保持一致，主界面显示，便于确认装的是哪版 */
-    public static final String VERSION_NAME = "1.9.7";
+    public static final String VERSION_NAME = "1.9.8";
 
     /** Ubuntu 24.04 base rootfs（arm64，tar.gz，约 30 MB，官方地址） */
     public static final String ROOTFS_URL =
@@ -30,6 +30,8 @@ public final class Const {
     public static final String DEFAULT_SCREEN = "1280x800";
     /** JVM 堆上限（MB），6 GB 内存设备建议 768~1024 */
     public static final int DEFAULT_HEAP_MB = 1024;
+    /** 可选堆档位（MB），从保守到激进 */
+    public static final int[] HEAP_OPTIONS = {512, 768, 1024, 1536, 2048, 3072};
 
     public static final int VNC_PORT = 5901;
     public static final int WEB_PORT = 6080;

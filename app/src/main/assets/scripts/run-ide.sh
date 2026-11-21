@@ -25,7 +25,7 @@ pkill -x openbox >/dev/null 2>&1 || true
 sleep 1
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 say() { echo "[run-ide +$(( $(date +%s) - START ))s] $*" | tee -a "$LOG"; }
-say "run-ide.sh v1.9.7 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
+say "run-ide.sh v1.9.8 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
 
 cleanup() {
   pkill -f "pycharm" >/dev/null 2>&1 || true

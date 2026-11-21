@@ -20,7 +20,7 @@ public class MainActivity extends Activity {
     private TextView status, detail, log;
     private ProgressBar bar;
     private ScrollView logScroll;
-    private TextView install, launch, display, stop, version;
+    private TextView install, launch, display, stop, version, heap;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private long lastLogVersion = -1;
     private boolean stickBottom = true;   // 用户滚到底部才自动跟随
@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
         display = findViewById(R.id.btnDisplay);
         stop = findViewById(R.id.btnStop);
         version = findViewById(R.id.btnVersion);
+        heap = findViewById(R.id.btnHeap);
 
 
         install.setOnClickListener(v -> {
@@ -99,6 +100,7 @@ public class MainActivity extends Activity {
 
         findViewById(R.id.btnMirror).setOnClickListener(v -> chooseMirror());
         findViewById(R.id.btnVersion).setOnClickListener(v -> chooseVersion());
+        findViewById(R.id.btnHeap).setOnClickListener(v -> chooseHeap());
 
         refresh();
     }
@@ -131,6 +133,63 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /** 堆内存入口：选择 JVM -Xmx，已安装时直接改写 pycharm64.vmoptions */
+    private void chooseHeap() {
+        if (SetupState.running) {
+            Toast.makeText(this, "安装进行中，完成后再调整堆内存", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int cur = Prefs.heapMb(this);
+        int[] opts = Const.HEAP_OPTIONS;
+        String[] hints = {
+                "4 GB 内存 / 轻量项目",
+                "6 GB 内存 / 推荐",
+                "默认 / 6–8 GB 内存",
+                "8 GB 内存 / 中大型项目",
+                "12 GB 内存 / 大型项目",
+                "16 GB 内存 / 极限",
+        };
+        String[] labels = new String[opts.length];
+        int checked = 0;
+        for (int i = 0; i < opts.length; i++) {
+            labels[i] = opts[i] + " MB · " + hints[i] + (opts[i] == cur ? " · 当前" : "");
+            if (opts[i] == HeapConfig.nearestOption(cur)) checked = i;
+        }
+        final int[] sel = {checked};
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("堆内存（JVM -Xmx）")
+                .setMessage("堆越大，索引、重构与大项目越流畅，但会占用更多物理内存。\n"
+                        + "修改后重启 PyCharm 生效；当前 " + cur + " MB。")
+                .setSingleChoiceItems(labels, checked, (d, which) -> sel[0] = which)
+                .setPositiveButton("应用", (d, which) -> applyHeap(opts[sel[0]]))
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void applyHeap(int mb) {
+        Prefs.setHeap(this, mb);
+        HeapConfig.writeVmoptions(this);
+        LogBus.append("[设置] JVM 堆上限 -> " + mb + " MB");
+        if (!Dirs.ideReadyMark(this).exists()) {
+            Toast.makeText(this, "堆已设为 " + mb + " MB，将在安装 PyCharm 时生效", Toast.LENGTH_SHORT).show();
+            refresh();
+            return;
+        }
+        final boolean running = IdeService.RUNNING;
+        Toast.makeText(this, "正在写入 vmoptions…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            final boolean ok = HeapConfig.applyToRootfs(MainActivity.this);
+            final String msg = ok
+                    ? "堆已设为 " + mb + " MB" + (running ? "，重启 PyCharm 后生效" : "，下次启动生效")
+                    : "未找到 pycharm64.vmoptions，请先重新安装 PyCharm";
+            LogBus.append("[设置] " + msg);
+            runOnUiThread(() -> {
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                refresh();
+            });
+        }, "heap").start();
     }
 
     /** 版本管理入口：选择并安装 / 清理下载包 / 卸载已装 PyCharm */
@@ -352,10 +411,12 @@ public class MainActivity extends Activity {
         display.setEnabled(ready);
         stop.setEnabled(IdeService.RUNNING);
         version.setEnabled(!SetupState.running);
+        heap.setEnabled(!SetupState.running);
         install.setAlpha(SetupState.running ? 0.45f : 1f);
         launch.setAlpha(ready && !SetupState.running ? 1f : 0.45f);
         display.setAlpha(ready ? 1f : 0.45f);
         stop.setAlpha(IdeService.RUNNING ? 1f : 0.45f);
+        heap.setAlpha(SetupState.running ? 0.45f : 1f);
 
         if (LogBus.version() != lastLogVersion) {
             lastLogVersion = LogBus.version();
