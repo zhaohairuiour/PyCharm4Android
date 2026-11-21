@@ -229,12 +229,12 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
     <h1>把桌面版<br><span class="accent">PyCharm</span> 装进手机</h1>
     <p class="lead">不是远程开发，也不是阉割客户端。APK 内置一套 Ubuntu arm64 用户态，proot 免 root 运行 JetBrains 官方 PyCharm，Xvfb 出图、x11vnc 推流，自研原生 RFB 客户端直接绘帧。</p>
     <div class="cta">
-      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.8-arm64.apk" download>下载最新版 v1.9.8 ↓</a>
+      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.9-arm64.apk" download>下载最新版 v1.9.9 ↓</a>
       <a id="ghlink2" class="btn secondary" href="https://github.com/" target="_blank" rel="noopener">查看源码</a>
     </div>
-    <div class="meta"><span>APK 280 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 dbeef96e919c…</span><span>镜像源 · GitProxy</span></div>
+    <div class="meta"><span>APK 280 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 7cfb6f42baa6…</span><span>镜像源 · GitProxy</span></div>
     <div class="stats">
-      <div class="stat"><b>25</b><span>个历史版本</span></div>
+      <div class="stat"><b>26</b><span>个历史版本</span></div>
       <div class="stat"><b>0</b><span>root 权限要求</span></div>
       <div class="stat"><b>Raw</b><span>原生 RFB 渲染</span></div>
       <div class="stat"><b>5901</b><span>固定 VNC 端口</span></div>
@@ -284,7 +284,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 </div></section>
 
 <section id="versions"><div class="wrap">
-  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 25 个版本</h2></div><p>从 1.0.0 到 1.9.8，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
+  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 26 个版本</h2></div><p>从 1.0.0 到 1.9.9，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
   <div class="lines">
     <span class="label">下载线路</span>
     <button class="line-switch active" type="button" data-line="mirror">GitProxy 镜像</button>
@@ -296,7 +296,14 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
       <thead><tr><th>版本</th><th>构建日期</th><th>体积</th><th>SHA-256</th><th></th></tr></thead>
       <tbody>
         <tr>
-          <td><span class="ver">v1.9.8</span> <span class="tag">LATEST</span></td>
+          <td><span class="ver">v1.9.9</span> <span class="tag">LATEST</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">280 KB</td>
+          <td><code data-sha="7cfb6f42baa6521df135923920c197737ff4f2eef6a747f41273ec0086f83dae">7cfb6f42baa6521d…</code></td>
+          <td><a class="dl" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.9-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.8</span></td>
           <td class="muted">2026-11-21</td>
           <td class="muted">280 KB</td>
           <td><code data-sha="dbeef96e919c3a20c144fc6488ae3cb45d31cf90b803b719c7ef2ba67cb24f51">dbeef96e919c3a20…</code></td>
@@ -497,6 +504,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <div class="section-head"><div><div class="eyebrow">// FAQ</div><h2>常见问题</h2></div><p>关于性能、账号与兼容性的高频问题。</p></div>
   <details><summary>需要 root 吗？</summary><p>不需要。使用 proot 用户态模拟，未解锁 Bootloader 的零售机也能安装。代价是 ptrace 带来的系统调用开销，启动阶段最明显。</p></details>
   <details><summary>堆内存怎么调？</summary><p>主界面点「堆内存」，可选 512 / 768 / 1024 / 1536 / 2048 / 3072 MB。已安装时直接改写容器内 <code>pycharm64.vmoptions</code>，重启 PyCharm 生效；安装过程中则自动写入所选档位，重复调整不会叠加多个 <code>-Xmx</code>。</p></details>
+  <details><summary>为什么强制横屏？</summary><p>PyCharm 桌面 UI 按 16:10 设计，竖屏下编辑器与工具窗口会被压得很窄。v1.9.9 起主界面和显示页都锁定 <code>sensorLandscape</code>，可左右翻转，但不会回到竖屏。</p></details>
   <details><summary>为什么首次启动很慢？</summary><p>要等 Xvfb 就绪、JBR 冷启动、PyCharm 索引初始化。7 GB 内存设备建议只开一个项目，社区版比专业版轻。</p></details>
   <details><summary>专业版需要账号吗？</summary><p>需要。专业版首次启动会要求登录 JetBrains 账号激活，含 30 天试用；社区版免费，无需账号。</p></details>
   <details><summary>支持哪些设备？</summary><p>arm64 设备、Android 8.0+、至少 7 GB 内存；安装 IDE 需要 8 GB 以上空闲存储。x86 设备不适用。</p></details>
