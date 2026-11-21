@@ -9,7 +9,7 @@
 [![Root](https://img.shields.io/badge/root-not%20required-41E3A0?style=flat-square)](#)
 [![UI](https://img.shields.io/badge/UI-v1.9.7-3D7BFF?style=flat-square)](#)
 
-[介绍页](docs/index.html) · [下载最新版](docs/apk/PyCharm4Android-1.9.7-arm64.apk) · [全部版本](#全部版本) · [构建](#构建)
+[介绍页](https://zhaohairuiour.github.io/PyCharm4Android/) · [下载最新版](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.7-arm64.apk) · [全部版本](#全部版本) · [构建](#构建)
 
 </div>
 
@@ -70,32 +70,34 @@ APK
 
 | 版本 | 日期 | 体积 | SHA-256 | APK |
 |---|---|---|---|---|
-| v1.9.7 | 2026-11-21 | 276 KB | [`3462e049f328…`] | [下载](docs/apk/PyCharm4Android-1.9.7-arm64.apk) |
-| v1.9.6 | 2026-11-21 | 270 KB | [`6d0f28581a09…`] | [下载](docs/apk/PyCharm4Android-1.9.6-arm64.apk) |
-| v1.9.5 | 2026-11-21 | 262 KB | [`582d5806ca72…`] | [下载](docs/apk/PyCharm4Android-1.9.5-arm64.apk) |
-| v1.9.4 | 2026-11-21 | 262 KB | [`6e3240e04f8d…`] | [下载](docs/apk/PyCharm4Android-1.9.4-arm64.apk) |
-| v1.9.3 | 2026-11-21 | 261 KB | [`c4b3636208c7…`] | [下载](docs/apk/PyCharm4Android-1.9.3-arm64.apk) |
-| v1.9.2 | 2026-11-21 | 261 KB | [`ad7f85cd7cca…`] | [下载](docs/apk/PyCharm4Android-1.9.2-arm64.apk) |
-| v1.9.1 | 2026-11-21 | 257 KB | [`a1ae26ffad6b…`] | [下载](docs/apk/PyCharm4Android-1.9.1-arm64.apk) |
-| v1.9.0 | 2026-11-21 | 257 KB | [`7264747e5834…`] | [下载](docs/apk/PyCharm4Android-1.9.0-arm64.apk) |
-| v1.8.3 | 2026-11-21 | 257 KB | [`4b4859ace03d…`] | [下载](docs/apk/PyCharm4Android-1.8.3-arm64.apk) |
-| v1.8.2 | 2026-11-21 | 257 KB | [`fa1f55fcac1b…`] | [下载](docs/apk/PyCharm4Android-1.8.2-arm64.apk) |
-| v1.8.1 | 2026-11-21 | 257 KB | [`512b0564993d…`] | [下载](docs/apk/PyCharm4Android-1.8.1-arm64.apk) |
-| v1.8.0 | 2026-11-21 | 257 KB | [`037324d95bd4…`] | [下载](docs/apk/PyCharm4Android-1.8.0-arm64.apk) |
-| v1.7.2 | 2026-11-21 | 257 KB | [`f1e51d848634…`] | [下载](docs/apk/PyCharm4Android-1.7.2-arm64.apk) |
-| v1.7.1 | 2026-11-21 | 257 KB | [`0b84b8b6d912…`] | [下载](docs/apk/PyCharm4Android-1.7.1-arm64.apk) |
-| v1.7.0 | 2026-11-21 | 257 KB | [`abd6185b6650…`] | [下载](docs/apk/PyCharm4Android-1.7.0-arm64.apk) |
-| v1.6.1 | 2026-11-21 | 244 KB | [`c2785aa82085…`] | [下载](docs/apk/PyCharm4Android-1.6.1-arm64.apk) |
-| v1.6.0 | 2026-11-21 | 244 KB | [`0ecd197f0747…`] | [下载](docs/apk/PyCharm4Android-1.6.0-arm64.apk) |
-| v1.5.0 | 2026-11-21 | 244 KB | [`de6a541cfa22…`] | [下载](docs/apk/PyCharm4Android-1.5.0-arm64.apk) |
-| v1.4.0 | 2026-11-21 | 199 KB | [`cd2903d678d6…`] | [下载](docs/apk/PyCharm4Android-1.4.0-arm64.apk) |
-| v1.3.0 | 2026-11-21 | 199 KB | [`503fe375a871…`] | [下载](docs/apk/PyCharm4Android-1.3.0-arm64.apk) |
-| v1.2.0 | 2026-11-20 | 199 KB | [`75c8ec792c16…`] | [下载](docs/apk/PyCharm4Android-1.2.0-arm64.apk) |
-| v1.1.1 | 2026-11-20 | 191 KB | [`6654047c1424…`] | [下载](docs/apk/PyCharm4Android-1.1.1-arm64.apk) |
-| v1.1.0 | 2026-11-20 | 191 KB | [`15bf4da9f3df…`] | [下载](docs/apk/PyCharm4Android-1.1.0-arm64.apk) |
-| v1.0.0 | 2026-11-20 | 187 KB | [`931c3830bb20…`] | [下载](docs/apk/PyCharm4Android-1.0.0-arm64.apk) |
+| v1.9.7 | 2026-11-21 | 276 KB | [`3462e049f328…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.7-arm64.apk) |
+| v1.9.6 | 2026-11-21 | 270 KB | [`6d0f28581a09…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.6-arm64.apk) |
+| v1.9.5 | 2026-11-21 | 262 KB | [`582d5806ca72…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.5-arm64.apk) |
+| v1.9.4 | 2026-11-21 | 262 KB | [`6e3240e04f8d…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.4-arm64.apk) |
+| v1.9.3 | 2026-11-21 | 261 KB | [`c4b3636208c7…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.3-arm64.apk) |
+| v1.9.2 | 2026-11-21 | 261 KB | [`ad7f85cd7cca…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.2-arm64.apk) |
+| v1.9.1 | 2026-11-21 | 257 KB | [`a1ae26ffad6b…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.1-arm64.apk) |
+| v1.9.0 | 2026-11-21 | 257 KB | [`7264747e5834…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.0-arm64.apk) |
+| v1.8.3 | 2026-11-21 | 257 KB | [`4b4859ace03d…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.8.3-arm64.apk) |
+| v1.8.2 | 2026-11-21 | 257 KB | [`fa1f55fcac1b…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.8.2-arm64.apk) |
+| v1.8.1 | 2026-11-21 | 257 KB | [`512b0564993d…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.8.1-arm64.apk) |
+| v1.8.0 | 2026-11-21 | 257 KB | [`037324d95bd4…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.8.0-arm64.apk) |
+| v1.7.2 | 2026-11-21 | 257 KB | [`f1e51d848634…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.7.2-arm64.apk) |
+| v1.7.1 | 2026-11-21 | 257 KB | [`0b84b8b6d912…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.7.1-arm64.apk) |
+| v1.7.0 | 2026-11-21 | 257 KB | [`abd6185b6650…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.7.0-arm64.apk) |
+| v1.6.1 | 2026-11-21 | 244 KB | [`c2785aa82085…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.6.1-arm64.apk) |
+| v1.6.0 | 2026-11-21 | 244 KB | [`0ecd197f0747…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.6.0-arm64.apk) |
+| v1.5.0 | 2026-11-21 | 244 KB | [`de6a541cfa22…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.5.0-arm64.apk) |
+| v1.4.0 | 2026-11-21 | 199 KB | [`cd2903d678d6…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.4.0-arm64.apk) |
+| v1.3.0 | 2026-11-21 | 199 KB | [`503fe375a871…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.3.0-arm64.apk) |
+| v1.2.0 | 2026-11-20 | 199 KB | [`75c8ec792c16…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.2.0-arm64.apk) |
+| v1.1.1 | 2026-11-20 | 191 KB | [`6654047c1424…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.1.1-arm64.apk) |
+| v1.1.0 | 2026-11-20 | 191 KB | [`15bf4da9f3df…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.1.0-arm64.apk) |
+| v1.0.0 | 2026-11-20 | 187 KB | [`931c3830bb20…`] | [下载](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.0.0-arm64.apk) |
 
 所有 APK 也放在 [`docs/apk/`](docs/apk/)，GitHub Pages 直接提供下载。覆盖安装保留容器与已下载的 IDE。
+
+> 国内下载建议使用镜像源：[ghfast 加速](https://ghfast.top/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.7-arm64.apk) · [ghproxy 备用](https://ghproxy.net/https://raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.7-arm64.apk)。介绍页的下载按钮默认走镜像，也可切换 GitHub 直链；全版本文件与 SHA-256 均一致。
 
 ## 安装
 
