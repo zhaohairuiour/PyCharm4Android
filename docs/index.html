@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PyCharm for Android · 在手机上运行桌面版 PyCharm</title>
+<meta name="description" content="把 JetBrains 官方 PyCharm 桌面版装进 Android 的 arm64 proot 容器，Xvfb + x11vnc + 原生 RFB 渲染，无需 root。">
+<style>
+:root {
+  --bg:#05080f; --panel:#0b1322; --panel2:#0f1a2c; --line:#1c2b44;
+  --cyan:#00e5ff; --blue:#3d7bff; --green:#41e3a0; --red:#ff5370;
+  --text:#eaf6ff; --muted:#8fa6c4; --dim:#5a7395;
+  --radius:20px; --max:1180px;
+}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+body::before {
+  content:""; position:fixed; inset:0; z-index:-2;
+  background:
+    radial-gradient(900px 520px at 82% -10%, rgba(0,213,255,.16), transparent 62%),
+    radial-gradient(700px 480px at -10% 30%, rgba(61,123,255,.14), transparent 60%),
+    linear-gradient(180deg,#05080f 0%,#080e1b 45%,#05080f 100%);
+}
+body::after {
+  content:""; position:fixed; inset:0; z-index:-1; opacity:.55; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,229,255,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,255,.045) 1px,transparent 1px);
+  background-size:34px 34px;
+  mask-image:linear-gradient(180deg,#000 0%,transparent 78%);
+}
+a { color:inherit; text-decoration:none; }
+.wrap { width:min(var(--max),calc(100% - 40px)); margin:0 auto; }
+.nav {
+  position:sticky; top:0; z-index:50; backdrop-filter:blur(18px);
+  background:rgba(5,8,15,.72); border-bottom:1px solid rgba(0,229,255,.1);
+}
+.nav .wrap { display:flex; align-items:center; gap:26px; height:66px; }
+.brand { display:flex; align-items:center; gap:11px; font-weight:800; letter-spacing:.2px; }
+.logo {
+  width:36px; height:36px; border-radius:12px; display:grid; place-items:center;
+  background:linear-gradient(135deg,var(--cyan),var(--blue));
+  color:#03121f; font-weight:900; font-size:19px;
+  box-shadow:0 0 26px rgba(0,229,255,.35);
+}
+.brand small { display:block; color:var(--muted); font-weight:500; font-size:10px; letter-spacing:.18em; margin-top:2px; }
+.navlinks { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.navlinks a { padding:9px 14px; border-radius:999px; color:var(--muted); font-size:13px; }
+.navlinks a:hover { color:var(--text); background:rgba(0,229,255,.08); }
+.ghost {
+  border:1px solid rgba(0,229,255,.32); color:#bdf4ff!important;
+  background:rgba(0,229,255,.06);
+}
+.hero { padding:76px 0 54px; display:grid; grid-template-columns:1.05fr .95fr; gap:54px; align-items:center; }
+.kicker {
+  display:inline-flex; gap:8px; align-items:center; padding:7px 12px; border-radius:999px;
+  border:1px solid rgba(0,229,255,.28); background:rgba(0,229,255,.07);
+  color:#9ff4ff; font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.2em;
+}
+.dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); }
+h1 { font-size:clamp(38px,5.2vw,64px); line-height:1.04; letter-spacing:-.035em; margin:20px 0 16px; }
+h1 .accent {
+  background:linear-gradient(100deg,var(--cyan),#7aa7ff 70%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.lead { color:var(--muted); font-size:16px; line-height:1.85; max-width:620px; margin:0 0 26px; }
+.cta { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.btn {
+  display:inline-flex; align-items:center; gap:9px; padding:14px 22px; border-radius:999px;
+  font-weight:700; font-size:14px; transition:.18s ease; border:1px solid transparent;
+}
+.primary {
+  background:linear-gradient(100deg,var(--cyan),var(--blue)); color:#03121f;
+  box-shadow:0 12px 36px rgba(0,180,255,.22);
+}
+.primary:hover { transform:translateY(-2px); box-shadow:0 16px 46px rgba(0,200,255,.3); }
+.secondary { border-color:rgba(0,229,255,.3); background:rgba(15,26,44,.6); color:#cdefff; }
+.secondary:hover { background:rgba(0,229,255,.09); }
+.meta { margin-top:18px; display:flex; gap:16px; flex-wrap:wrap; color:var(--dim); font:11px/1.6 ui-monospace,monospace; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:38px; }
+.stat { padding:16px 18px; border:1px solid var(--line); border-radius:16px; background:rgba(10,18,34,.55); }
+.stat b { display:block; font-size:22px; letter-spacing:-.02em; color:#dff7ff; }
+.stat span { color:var(--dim); font-size:11px; }
+
+/* phone mock */
+.phone {
+  width:min(360px,100%); margin:0 auto; padding:10px; border-radius:34px;
+  background:linear-gradient(160deg,#16233a,#070c15);
+  border:1px solid rgba(0,229,255,.25);
+  box-shadow:0 40px 90px rgba(0,0,0,.55),0 0 70px rgba(0,180,255,.12);
+}
+.screen { border-radius:26px; background:#05080f; overflow:hidden; border:1px solid #14213a; }
+.winbar {
+  height:38px; display:flex; align-items:center; padding:0 12px; gap:8px;
+  background:#2b2d30; border-bottom:1px solid #3c3f41;
+}
+.winbar .ico { width:18px;height:18px;border-radius:5px; background:linear-gradient(135deg,var(--cyan),var(--blue)); }
+.winbar .title { flex:1; text-align:center; font-size:10px; color:#e8eaed; }
+.wbtns { display:flex; gap:10px; color:#c9cdd3; font-size:11px; }
+.wclose { color:#ff5370; }
+.mockbody { display:flex; height:440px; }
+.sidebar { width:74px; background:#1e1f22; border-right:1px solid #2b2d30; padding:10px 8px; }
+.sidebar i { display:block; height:6px; border-radius:4px; background:#3a3d42; margin:9px 0; }
+.sidebar i:nth-child(2) { background:rgba(0,229,255,.55); width:80%; }
+.tree { flex:1; padding:14px 12px; font:10px/1.9 ui-monospace,monospace; color:#8fa6c4; }
+.tree p { margin:0; }
+.tree .cyan { color:#7de9ff; }
+.tree .green { color:#8dffc6; }
+.tree .dim { color:#4a6488; }
+.dock {
+  margin:10px; border:1px solid #34373d; border-radius:16px; background:#1a1c20;
+  padding:8px; display:flex; flex-wrap:wrap; gap:6px;
+}
+.dock span {
+  padding:6px 10px; border-radius:999px; border:1px solid #3b3e44; background:#2a2d31;
+  font-size:9px; color:#d9e8f5;
+}
+.dock .primary2 { background:linear-gradient(100deg,var(--cyan),var(--blue)); color:#03121f; border:0; font-weight:700; }
+
+section { padding:74px 0; }
+.section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:28px; }
+.eyebrow { color:var(--cyan); font:600 10px/1.4 ui-monospace,monospace; letter-spacing:.24em; }
+h2 { font-size:clamp(26px,3.2vw,38px); margin:8px 0 0; letter-spacing:-.025em; }
+.section-head p { color:var(--muted); max-width:420px; line-height:1.8; margin:0; font-size:13px; }
+.grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.card {
+  padding:24px; border-radius:var(--radius); border:1px solid var(--line);
+  background:linear-gradient(160deg,rgba(18,28,48,.78),rgba(8,14,26,.72));
+  position:relative; overflow:hidden;
+}
+.card::after {
+  content:""; position:absolute; right:-40px; top:-40px; width:130px; height:130px;
+  background:radial-gradient(circle,rgba(0,229,255,.12),transparent 70%);
+}
+.card .num { color:var(--cyan); font:700 11px/1 ui-monospace,monospace; letter-spacing:.16em; }
+.card h3 { margin:14px 0 8px; font-size:17px; }
+.card p { margin:0; color:var(--muted); font-size:13px; line-height:1.85; }
+
+.arch { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:22px; border-radius:var(--radius); border:1px solid var(--line); background:rgba(10,18,34,.55); }
+.node { padding:12px 16px; border-radius:14px; border:1px solid rgba(0,229,255,.22); background:rgba(0,229,255,.05); font:600 12px/1 ui-monospace,monospace; color:#c9f7ff; }
+.arrow { color:var(--dim); }
+
+.tablewrap { border:1px solid var(--line); border-radius:var(--radius); overflow:auto; background:rgba(7,12,22,.8); }
+table { width:100%; border-collapse:collapse; min-width:720px; }
+th, td { text-align:left; padding:14px 18px; border-bottom:1px solid rgba(28,43,68,.7); font-size:13px; }
+th { color:var(--dim); font:600 10px/1.4 ui-monospace,monospace; letter-spacing:.14em; background:rgba(15,26,44,.65); }
+tr:last-child td { border-bottom:0; }
+.ver { font-weight:800; color:#dff7ff; }
+.tag { font:700 8px/1 ui-monospace,monospace; color:#03121f; background:var(--cyan); padding:4px 7px; border-radius:999px; margin-left:6px; vertical-align:2px; }
+.muted { color:var(--muted); }
+code { font:11px/1.6 ui-monospace,monospace; color:#7de9ff; background:rgba(0,229,255,.06); padding:3px 7px; border-radius:7px; }
+.dl { color:var(--cyan); border:1px solid rgba(0,229,255,.28); padding:6px 12px; border-radius:999px; font-size:12px; white-space:nowrap; }
+.dl:hover { background:rgba(0,229,255,.1); }
+
+.steps { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.step { padding:22px; border-radius:18px; border:1px solid var(--line); background:rgba(10,18,34,.55); }
+.step .n { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:rgba(0,229,255,.1); color:var(--cyan); border:1px solid rgba(0,229,255,.3); font:700 13px/1 ui-monospace,monospace; }
+.step h3 { margin:14px 0 8px; font-size:16px; }
+.step p { margin:0; color:var(--muted); font-size:12.5px; line-height:1.85; }
+
+.shots { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; }
+.shot { border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:#000; }
+.shot img { width:100%; display:block; }
+.shot .cap { padding:12px 14px; color:var(--dim); font-size:11px; border-top:1px solid var(--line); background:rgba(10,18,34,.7); }
+
+details { border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:10px; background:rgba(10,18,34,.45); }
+summary { cursor:pointer; font-weight:700; font-size:13.5px; }
+details p { color:var(--muted); font-size:13px; line-height:1.8; margin:12px 0 0; }
+
+footer { border-top:1px solid rgba(0,229,255,.1); padding:36px 0 44px; color:var(--dim); font-size:11px; }
+footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; align-items:center; }
+.toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%,20px); background:#0f1a2c; border:1px solid rgba(0,229,255,.45); color:#c9f7ff; padding:10px 16px; border-radius:999px; font-size:12px; opacity:0; pointer-events:none; transition:.2s; z-index:99; }
+.toast.show { opacity:1; transform:translate(-50%,0); }
+
+@media (max-width:900px) {
+  .hero { grid-template-columns:1fr; padding-top:50px; }
+  .phone { order:-1; }
+  .grid4,.steps { grid-template-columns:repeat(2,1fr); }
+  .shots { grid-template-columns:1fr; }
+  .navlinks a:not(.ghost) { display:none; }
+}
+@media (max-width:560px) {
+  .wrap { width:calc(100% - 28px); }
+  .hero { gap:34px; }
+  .stats { grid-template-columns:repeat(2,1fr); }
+  .grid4,.steps { grid-template-columns:1fr; }
+  .cta .btn { flex:1; justify-content:center; }
+  h1 { font-size:40px; }
+  .mockbody { height:390px; }
+}
+</style>
+</head>
+<body>
+<div class="nav"><div class="wrap">
+  <a class="brand" href="#top"><span class="logo">P</span><span>PyCharm for Android<small>ANDROID CONTAINER</small></span></a>
+  <nav class="navlinks">
+    <a href="#features">特性</a>
+    <a href="#versions">版本</a>
+    <a href="#install">安装</a>
+    <a href="#faq">FAQ</a>
+    <a id="ghlink" class="ghost" href="https://github.com/" target="_blank" rel="noopener">GitHub ↗</a>
+  </nav>
+</div></div>
+
+<main id="top">
+<div class="wrap hero">
+  <div>
+    <span class="kicker"><span class="dot"></span>ARM64 · PROOT · NO ROOT</span>
+    <h1>把桌面版<br><span class="accent">PyCharm</span> 装进手机</h1>
+    <p class="lead">不是远程开发，也不是阉割客户端。APK 内置一套 Ubuntu arm64 用户态，proot 免 root 运行 JetBrains 官方 PyCharm，Xvfb 出图、x11vnc 推流，自研原生 RFB 客户端直接绘帧。</p>
+    <div class="cta">
+      <a class="btn primary" href="apk/PyCharm4Android-1.9.7-arm64.apk" download>下载最新版 v1.9.7 ↓</a>
+      <a id="ghlink2" class="btn secondary" href="https://github.com/" target="_blank" rel="noopener">查看源码</a>
+    </div>
+    <div class="meta"><span>APK 276 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 3462e049f328…</span></div>
+    <div class="stats">
+      <div class="stat"><b>24</b><span>个历史版本</span></div>
+      <div class="stat"><b>0</b><span>root 权限要求</span></div>
+      <div class="stat"><b>Raw</b><span>原生 RFB 渲染</span></div>
+      <div class="stat"><b>5901</b><span>固定 VNC 端口</span></div>
+    </div>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="winbar"><span class="ico"></span><span class="title">PyCharm 2025.3</span><span class="wbtns"><span>—</span><span>▢</span><span class="wclose">×</span></span></div>
+      <div class="mockbody">
+        <div class="sidebar"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="tree">
+          <p class="cyan"># main.py</p>
+          <p><span class="green">def</span> hello():</p>
+          <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="green">print</span>(<span class="cyan">"PyCharm on Android"</span>)</p>
+          <p class="dim">&nbsp;</p>
+          <p class="dim">&gt; Running main.py</p>
+          <p class="green">PyCharm on Android</p>
+          <p class="dim">Process finished with exit code 0</p>
+        </div>
+      </div>
+      <div class="dock"><span class="primary2">键盘</span><span>中文</span><span>日志</span><span>诊断</span><span>重连</span><span>←</span><span>→</span><span>右键</span><span>适配</span></div>
+    </div>
+  </div>
+</div>
+
+<section id="features"><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// CAPABILITIES</div><h2>桌面级 IDE，移动端形态</h2></div><p>把 Linux 运行时、X 服务和渲染通道全部塞进一个 APK，安装后按需下载镜像与 IDE。</p></div>
+  <div class="grid4">
+    <div class="card"><div class="num">01</div><h3>官方 PyCharm</h3><p>直接运行 JetBrains 官方 Linux arm64 构建，社区版 2022.3–2025.3、专业版 2022.3–2026.3 可选。</p></div>
+    <div class="card"><div class="num">02</div><h3>免 root 容器</h3><p>Termux 版 proot + 自编译 loader，绑定 /dev、/proc、/sys，Android 8.0 以上即可运行。</p></div>
+    <div class="card"><div class="num">03</div><h3>原生 RFB</h3><p>不走 noVNC / WebView。Raw + CopyRect 编码直接写 Bitmap，省掉 JS 解码与两次内存拷贝。</p></div>
+    <div class="card"><div class="num">04</div><h3>触控与键盘</h3><p>单指移动/轻点/长按拖拽、双指缩放平移、双指右键，自绘六行软键盘直接注入 keysym。</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// ARCHITECTURE</div><h2>一条链路，五层运行时</h2></div><p>x11vnc 只发 Raw 像素，客户端直接绘帧；端口固定 5901，启动脚本每次从 APK 刷新。</p></div>
+  <div class="arch">
+    <span class="node">APK</span><span class="arrow">→</span>
+    <span class="node">proot · Ubuntu 24.04 arm64</span><span class="arrow">→</span>
+    <span class="node">Xvfb :1</span><span class="arrow">→</span>
+    <span class="node">x11vnc :5901</span><span class="arrow">→</span>
+    <span class="node">Native RFB</span><span class="arrow">→</span>
+    <span class="node">Canvas · Bitmap</span>
+  </div>
+</div></section>
+
+<section id="versions"><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 24 个版本</div></div><p>从 1.0.0 到 1.9.7，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>版本</th><th>构建日期</th><th>体积</th><th>SHA-256</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="ver">v1.9.7</span> <span class="tag">LATEST</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">276 KB</td>
+          <td><code data-sha="3462e049f3289159b0e08ac339882db2ddfa6b11eb710036069b24658d3e9672">3462e049f3289159…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.7-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.6</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">270 KB</td>
+          <td><code data-sha="6d0f28581a09ab36add285336b6cb5493298fb1e441f0151f77b4aeff924a8e0">6d0f28581a09ab36…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.6-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.5</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">262 KB</td>
+          <td><code data-sha="582d5806ca7227118253017473a7c41f45910f837a273ef8ad7fe1c42089fec3">582d5806ca722711…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.5-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.4</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">262 KB</td>
+          <td><code data-sha="6e3240e04f8dc3927b3fe5b8b576c69fe1509f94f781d44ee26bbaf61d199f61">6e3240e04f8dc392…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.4-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.3</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">261 KB</td>
+          <td><code data-sha="c4b3636208c7d56c7d1ac2f55cc16ebbc9042b70186bb53d44b22bfa8911eac2">c4b3636208c7d56c…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.3-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.2</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">261 KB</td>
+          <td><code data-sha="ad7f85cd7cca06861b3939a43724a2cc039b115b94ef69960b97ead5cd856476">ad7f85cd7cca0686…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.2-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.1</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="a1ae26ffad6b5c0ab465ed84af756da81ca460fdfc0b8eaddb011db895bcd15d">a1ae26ffad6b5c0a…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.1-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="7264747e5834d07287d899fdbde6758b64c5c27fa71f534f14d1fcb9ffdcb75d">7264747e5834d072…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.9.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.8.3</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="4b4859ace03d3e8502d2803cddccc905ba5e975a24b6f8f1b0ba6d1074c14e36">4b4859ace03d3e85…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.8.3-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.8.2</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="fa1f55fcac1bf2779ff20ca4a1482adcec8038a3e1da43c6819f6556f18229bd">fa1f55fcac1bf277…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.8.2-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.8.1</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="512b0564993d931af6cc8dc0706fc9288d6a02c556791449c5db88e10ed6cc49">512b0564993d931a…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.8.1-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.8.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="037324d95bd4878a6c54f486e1bf4da16706fdedc384d9b8324980f628355ee9">037324d95bd4878a…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.8.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.7.2</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="f1e51d848634814dd9bcef67653bbcdb9d23b71356dcf253f8c9806349f4d13a">f1e51d848634814d…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.7.2-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.7.1</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="0b84b8b6d912e4b1059616395bb9dee8d46e126b7ba8f4c9c0c591b653f5a95a">0b84b8b6d912e4b1…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.7.1-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.7.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">257 KB</td>
+          <td><code data-sha="abd6185b66501d916651cfbf9655677adfd3d44db74e919ae18fdb09d56f8155">abd6185b66501d91…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.7.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.6.1</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">244 KB</td>
+          <td><code data-sha="c2785aa8208561deb9da6d11d67be5597fb79de346fade6420a98de084058684">c2785aa8208561de…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.6.1-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.6.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">244 KB</td>
+          <td><code data-sha="0ecd197f07473cdb995e6c5e68e3dc29a17040a2de28be8b020b4ed174f907b4">0ecd197f07473cdb…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.6.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.5.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">244 KB</td>
+          <td><code data-sha="de6a541cfa2245c5be938ca8f0f7ec12dffa619f18a03c68f601316c13894333">de6a541cfa2245c5…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.5.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.4.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">199 KB</td>
+          <td><code data-sha="cd2903d678d6737c875db59e4a22ff9638100d01dd87df4d94402c073396a24a">cd2903d678d6737c…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.4.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.3.0</span></td>
+          <td class="muted">2026-11-21</td>
+          <td class="muted">199 KB</td>
+          <td><code data-sha="503fe375a871a197775891ebfc89d5fa32e5261b135f35de0f1ad547832d0229">503fe375a871a197…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.3.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.2.0</span></td>
+          <td class="muted">2026-11-20</td>
+          <td class="muted">199 KB</td>
+          <td><code data-sha="75c8ec792c16169a7f33548edbd7f998cc949901873162e47fffbde0a5e3aab8">75c8ec792c16169a…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.2.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.1.1</span></td>
+          <td class="muted">2026-11-20</td>
+          <td class="muted">191 KB</td>
+          <td><code data-sha="6654047c1424ee9ba44e0c5da986233deaf7981dbdf3baa1d3be9fbf5b7beb90">6654047c1424ee9b…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.1.1-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.1.0</span></td>
+          <td class="muted">2026-11-20</td>
+          <td class="muted">191 KB</td>
+          <td><code data-sha="15bf4da9f3df7e6b12af36f927a31e77681c23fac56dc91bdee981ad5a001093">15bf4da9f3df7e6b…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.1.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.0.0</span></td>
+          <td class="muted">2026-11-20</td>
+          <td class="muted">187 KB</td>
+          <td><code data-sha="931c3830bb20ccd0b99de19c42c5fe5299e683ca5b9611f611f723170910e5e5">931c3830bb20ccd0…</code></td>
+          <td><a class="dl" href="apk/PyCharm4Android-1.0.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<section id="install"><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// QUICK START</div><h2>三步跑起来</h2></div><p>首次安装需要下载约 30 MB 系统镜像与 750 MB–1.3 GB IDE，建议 Wi-Fi + 至少 8 GB 空闲存储。</p></div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>安装 APK</h3><p>下载最新版 arm64 APK，允许「安装未知应用」。覆盖安装即可升级，容器与项目文件保留。</p></div>
+    <div class="step"><div class="n">2</div><h3>开始安装</h3><p>打开应用点「开始安装」。自动校验 SHA-256、解包 Ubuntu base、apt 安装 X11/VNC、下载并解包 PyCharm。</p></div>
+    <div class="step"><div class="n">3</div><h3>启动 PyCharm</h3><p>点「启动 PyCharm」进入桌面。首次 JVM 冷启动 1–3 分钟，之后固定连接 127.0.0.1:5901。</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// GALLERY</div><h2>容器内的 PyCharm</h2></div><p>以下是本地等价环境跑通的截图：Xvfb 出图、x11vnc 推流、原生 RFB 抓帧。</p></div>
+  <div class="shots">
+    <div class="shot"><img src="screenshots/screenshot-welcome.png" alt="PyCharm 欢迎页"><div class="cap">PyCharm Welcome · 1280×800 虚拟屏</div></div>
+    <div class="shot"><img src="screenshots/screenshot-terms.png" alt="PyCharm 许可协议"><div class="cap">首次启动许可协议</div></div>
+  </div>
+</div></section>
+
+<section id="faq"><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// FAQ</div><h2>常见问题</h2></div><p>关于性能、账号与兼容性的高频问题。</p></div>
+  <details><summary>需要 root 吗？</summary><p>不需要。使用 proot 用户态模拟，未解锁 Bootloader 的零售机也能安装。代价是 ptrace 带来的系统调用开销，启动阶段最明显。</p></details>
+  <details><summary>为什么首次启动很慢？</summary><p>要等 Xvfb 就绪、JBR 冷启动、PyCharm 索引初始化。7 GB 内存设备建议只开一个项目，社区版比专业版轻。</p></details>
+  <details><summary>专业版需要账号吗？</summary><p>需要。专业版首次启动会要求登录 JetBrains 账号激活，含 30 天试用；社区版免费，无需账号。</p></details>
+  <details><summary>支持哪些设备？</summary><p>arm64 设备、Android 8.0+、至少 7 GB 内存；安装 IDE 需要 8 GB 以上空闲存储。x86 设备不适用。</p></details>
+  <details><summary>为什么端口固定 5901？</summary><p>display :1 的传统 VNC 端口。服务端和客户端都写死 5901，避免端口扫描带来的连接抖动。</p></details>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>© 2026 PyCharm for Android · 非 JetBrains 官方项目</span>
+  <span>PyCharm 是 JetBrains s.r.o. 的商标 · 本项目仅封装官方 Linux 发行版</span>
+</div></footer>
+<div id="toast" class="toast">已复制</div>
+<script>
+(function(){
+  const host=location.hostname, path=location.pathname.split('/').filter(Boolean);
+  let owner='', repo='';
+  if(host.endsWith('github.io')) { owner=host.split('.')[0]; repo=path[0]||''; }
+  if(owner&&repo){
+    const base='https://github.com/'+owner+'/'+repo;
+    for(const id of ['ghlink','ghlink2']){ const a=document.getElementById(id); if(a) a.href=base; }
+  }
+  const toast=document.getElementById('toast');
+  document.querySelectorAll('code').forEach(el=>{
+    el.style.cursor='pointer'; el.title='点击复制完整 SHA-256';
+    el.addEventListener('click',()=>{
+      const full=el.dataset.sha||el.textContent.replace('…','');
+      navigator.clipboard&&navigator.clipboard.writeText(full).then(()=>{
+        toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1200);
+      });
+    });
+  });
+  const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting) e.target.style.opacity=1; }),{threshold:.1});
+})();
+</script>
+</body>
+</html>

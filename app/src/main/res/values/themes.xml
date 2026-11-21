@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="icbg">#FF0F9D58</color>
+    <color name="bg_deep">#FF05080F</color>
+    <color name="tech_cyan">#FF00E5FF</color>
+
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/tech_cyan</item>
+        <item name="android:colorPrimaryDark">@color/bg_deep</item>
+        <item name="android:colorAccent">@color/tech_cyan</item>
+        <item name="android:windowBackground">@color/bg_deep</item>
+        <item name="android:statusBarColor">@color/bg_deep</item>
+        <item name="android:navigationBarColor">@color/bg_deep</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:alertDialogTheme">@style/TechDialog</item>
+    </style>
+
+    <style name="TechDialog" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:colorAccent">@color/tech_cyan</item>
+        <item name="android:textColorPrimary">#FFEAF6FF</item>
+        <item name="android:textColorSecondary">#FF8FA6C4</item>
+        <item name="android:windowMinWidthMajor">86%</item>
+        <item name="android:windowMinWidthMinor">86%</item>
+    </style>
+
+    <style name="AppTheme.Fullscreen" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+    </resources>
