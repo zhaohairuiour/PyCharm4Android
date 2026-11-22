@@ -25,7 +25,7 @@ pkill -x openbox >/dev/null 2>&1 || true
 sleep 1
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 say() { echo "[run-ide +$(( $(date +%s) - START ))s] $*" | tee -a "$LOG"; }
-say "run-ide.sh v1.9.9 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
+say "run-ide.sh v1.11.0 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
 
 cleanup() {
   pkill -f "pycharm" >/dev/null 2>&1 || true
@@ -123,16 +123,34 @@ fi
 say "窗口管理器 openbox"
 openbox --sm-disable >>"$XL" 2>&1 &
 
-if [ ! -x "$IDE_DIR/bin/pycharm.sh" ]; then
+# 兼容已有安装：容器内 inotify 不可靠，禁用 JetBrains 原生文件监听，避免
+# “File watcher gave up to operate / External file changes sync might be slow”。
+if [ -f "$IDE_DIR/bin/idea.properties" ]; then
+  grep -q '^idea.filewatcher.disabled=' "$IDE_DIR/bin/idea.properties" \
+    || echo 'idea.filewatcher.disabled=true' >>"$IDE_DIR/bin/idea.properties"
+  grep -q '^ide.no.platform.update=' "$IDE_DIR/bin/idea.properties" \
+    || echo 'ide.no.platform.update=true' >>"$IDE_DIR/bin/idea.properties"
+  say "已禁用原生 file watcher（容器内 inotify 不可靠）"
+fi
+
+# 旧版本安装可能保留无执行位的原生 launcher，启动前补齐权限
+[ -f "$IDE_DIR/bin/pycharm" ] && chmod +x "$IDE_DIR/bin/pycharm" 2>/dev/null
+
+if [ ! -x "$IDE_DIR/bin/pycharm" ] && [ ! -x "$IDE_DIR/bin/pycharm.sh" ]; then
   say "IDE 目录不存在或不可执行：$IDE_DIR"
   exit 4
 fi
+# 优先原生 launcher：JetBrains 在脚本启动时会提示切换到 bin/pycharm；
+# 原生 launcher 也负责正确的 fsnotifier / Restarter 生命周期。
+LAUNCHER="$IDE_DIR/bin/pycharm"
+if [ ! -x "$LAUNCHER" ]; then LAUNCHER="$IDE_DIR/bin/pycharm.sh"; fi
+say "启动器：$(basename "$LAUNCHER")"
 # IDE 守护循环：PyCharm 自己「Restart IDE」会退出 JVM，旧脚本随之退出并杀掉 Xvfb/x11vnc，
 # 表现为整个 App 关闭。这里保持 X/VNC 常驻，IDE 退出后自动重新拉起。
 FAILS=0
 while true; do
-  say "PyCharm 启动（JBR 冷启动，首次 1~3 分钟）"
-  ( cd "$IDE_DIR" && "$IDE_DIR/bin/pycharm.sh" ) >>"$LOG" 2>&1 &
+  say "PyCharm 启动（$(basename "$LAUNCHER")，JBR 冷启动，首次 1~3 分钟）"
+  ( cd "$IDE_DIR" && "$LAUNCHER" ) >>"$LOG" 2>&1 &
   IDE_PID=$!
   say "PyCharm 进程已拉起 pid=$IDE_PID"
   wait "$IDE_PID"

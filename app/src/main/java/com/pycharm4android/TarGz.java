@@ -7,8 +7,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,13 +25,36 @@ public final class TarGz {
 
     private static final int BLOCK = 512;
 
+    /** 解包进度：done/total 为压缩包已读/总字节，current 为当前条目路径 */
+    public interface Progress {
+        void onProgress(long done, long total, String current);
+    }
+
     public static void extract(File archive, File dest) throws IOException {
+        extract(archive, dest, null);
+    }
+
+    /** gzip 尾部 ISIZE，解压前即可拿到近似总大小（< 4 GB） */
+    public static long uncompressedSize(File archive) {
+        if (archive == null || archive.length() < 18) return 0;
+        try (RandomAccessFile raf = new RandomAccessFile(archive, "r")) {
+            raf.seek(archive.length() - 4);
+            return raf.readInt() & 0xffffffffL;
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    public static void extract(File archive, File dest, Progress progress) throws IOException {
         dest.mkdirs();
         int files = 0;
         String paxPath = null, paxLink = null, longName = null, longLink = null;
+        Reporter reporter = null;
 
-        try (InputStream raw = new BufferedInputStream(new FileInputStream(archive), 256 * 1024);
+        try (CountingInputStream raw = new CountingInputStream(
+                new BufferedInputStream(new FileInputStream(archive), 256 * 1024));
              InputStream in = new BufferedInputStream(new GZIPInputStream(raw, 256 * 1024), 256 * 1024)) {
+            reporter = new Reporter(progress, raw, archive.length());
 
             byte[] hdr = new byte[BLOCK];
             while (true) {
@@ -82,6 +107,7 @@ public final class TarGz {
 
                 // 设备节点在无 root 的 Android 上无法创建，跳过（运行时由 proot 绑定宿主 /dev）
                 boolean isDev = path.startsWith("dev/") || path.equals("dev");
+                reporter.path(path);
 
                 File out = safeChild(dest, path);
                 if (out == null) {
@@ -142,7 +168,7 @@ public final class TarGz {
                             break;
                         }
                         try (FileOutputStream fos = new FileOutputStream(out)) {
-                            copyData(in, fos, size);
+                            copyData(in, fos, size, reporter);
                         }
                         skipPad(in, size);
                         Io.chmod(out.getPath(), mode | 0600);
@@ -153,7 +179,59 @@ public final class TarGz {
                 }
             }
         }
+        if (reporter != null) reporter.finish();
         LogBus.append("[解包] 完成，共 " + files + " 个文件 -> " + dest.getAbsolutePath());
+    }
+
+    private static final class CountingInputStream extends FilterInputStream {
+        long count;
+        CountingInputStream(InputStream in) { super(in); }
+        @Override public int read() throws IOException {
+            int n = super.read();
+            if (n >= 0) count++;
+            return n;
+        }
+        @Override public int read(byte[] b, int off, int len) throws IOException {
+            int n = super.read(b, off, len);
+            if (n > 0) count += n;
+            return n;
+        }
+    }
+
+    private static final class Reporter {
+        private final Progress progress;
+        private final CountingInputStream counter;
+        private final long total;
+        private String current = "";
+        private long lastAt = 0;
+
+        Reporter(Progress progress, CountingInputStream counter, long total) {
+            this.progress = progress;
+            this.counter = counter;
+            this.total = total;
+        }
+
+        void path(String path) {
+            current = path;
+            report(false);
+        }
+
+        void tick() {
+            report(false);
+        }
+
+        void finish() {
+            if (progress != null) progress.onProgress(total, total, current);
+        }
+
+        private void report(boolean force) {
+            if (progress == null) return;
+            long now = System.currentTimeMillis();
+            if (!force && now - lastAt < 250) return;
+            lastAt = now;
+            long done = total > 0 ? Math.min(counter.count, total) : counter.count;
+            progress.onProgress(done, total, current);
+        }
     }
 
     private static Map<String, String> parsePax(String body) {
@@ -258,7 +336,7 @@ public final class TarGz {
         return new String(bos.toByteArray(), StandardCharsets.UTF_8).trim();
     }
 
-    private static void copyData(InputStream in, FileOutputStream out, long size) throws IOException {
+    private static void copyData(InputStream in, FileOutputStream out, long size, Reporter reporter) throws IOException {
         long remaining = size;
         byte[] buf = new byte[64 * 1024];
         while (remaining > 0) {
@@ -266,6 +344,7 @@ public final class TarGz {
             if (n < 0) throw new IOException("tar 数据截断");
             out.write(buf, 0, n);
             remaining -= n;
+            reporter.tick();
         }
     }
 

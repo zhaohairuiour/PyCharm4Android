@@ -35,6 +35,10 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
     private SoftKeysView softKeys;
     private TextView status;
     private LinearLayout logPanel;
+    private LinearLayout dock;
+    private TextView dockHandle;
+    private FrameLayout.LayoutParams vncParams, logParams;
+    private boolean dockCollapsed = false;
     private TextView logStage, logText;
     private ScrollView logScroll;
     private VncClient client;
@@ -65,6 +69,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         FrameLayout.LayoutParams vp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         vp.bottomMargin = dp(90);   // 给底部控制坞让位
+        vncParams = vp;
         root.addView(vncView, vp);
 
         imeInput = new VncKeyboardView(this);
@@ -145,6 +150,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         pp.topMargin = dp(8);
         pp.bottomMargin = dp(94);
+        logParams = pp;
         root.addView(logPanel, pp);
 
         status = new TextView(this);
@@ -162,7 +168,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
     }
 
     private void buildToolbar(FrameLayout root) {
-        LinearLayout dock = new LinearLayout(this);
+        dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xF21A1C20);
@@ -174,6 +180,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         LinearLayout primary = new LinearLayout(this);
         primary.setOrientation(LinearLayout.HORIZONTAL);
         primary.setGravity(Gravity.CENTER_VERTICAL);
+        primary.addView(pill("收起 ▾", v -> setDockCollapsed(true)));
         primary.addView(pill("键盘", v -> toggleSoftKeys()));
         primary.addView(pill("中文", v -> toggleIme()));
         primary.addView(pill("日志", v -> toggleLogs()));
@@ -222,6 +229,31 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         root.addView(dock, bp);
+
+        dockHandle = pill("控制栏 ▲", 0xFFB9F4FF, 0xE61A1C20, 0xFF3B5668, v -> setDockCollapsed(false));
+        dockHandle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        dockHandle.setVisibility(View.GONE);
+        FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        hp.bottomMargin = dp(8);
+        root.addView(dockHandle, hp);
+    }
+
+    /** 收起/展开底部控制坞；收起后 VNC 画布与日志面板扩展到底部 */
+    private void setDockCollapsed(boolean collapsed) {
+        dockCollapsed = collapsed;
+        dock.setVisibility(collapsed ? View.GONE : View.VISIBLE);
+        dockHandle.setVisibility(collapsed ? View.VISIBLE : View.GONE);
+        int bottom = dp(collapsed ? 42 : 90);
+        vncParams.bottomMargin = bottom;
+        vncView.setLayoutParams(vncParams);
+        logParams.bottomMargin = collapsed ? dp(46) : dp(94);
+        logPanel.setLayoutParams(logParams);
+        if (collapsed) {
+            softKeys.setVisibility(View.GONE);
+            hideIme();
+        }
     }
 
     /** 圆角胶囊按钮 + 水波纹反馈，替代原来的灰色文字块 */

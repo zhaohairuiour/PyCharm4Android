@@ -286,20 +286,48 @@ public class MainActivity extends Activity {
     }
 
     private void cleanCache() {
+        SetupState.running = true;
+        SetupState.operation = "清理缓存";
+        SetupState.error = false;
+        SetupState.indeterminate = true;
+        SetupState.percent = 0;
+        SetupState.stage = "扫描下载缓存";
+        SetupState.detail = "查找 pycharm-*.tar.gz";
+        refresh();
         new Thread(() -> {
             long freed = 0;
-            java.io.File dl = Dirs.dl(this);
-            java.io.File[] files = dl.listFiles();
-            if (files != null) {
-                for (java.io.File f : files) {
-                    String n = f.getName();
-                    if (n.startsWith("pycharm-") && n.endsWith(".tar.gz")) {
-                        freed += f.length();
-                        //noinspection ResultOfMethodCallIgnored
-                        f.delete();
+            try {
+                java.io.File dl = Dirs.dl(this);
+                java.io.File[] all = dl.listFiles();
+                java.util.List<java.io.File> targets = new java.util.ArrayList<>();
+                long totalBytes = 0;
+                if (all != null) {
+                    for (java.io.File f : all) {
+                        String n = f.getName();
+                        if (n.startsWith("pycharm-") && n.endsWith(".tar.gz")) {
+                            targets.add(f);
+                            totalBytes += f.length();
+                        }
                     }
                 }
+                int total = targets.size();
+                for (int i = 0; i < total; i++) {
+                    java.io.File f = targets.get(i);
+                    long len = f.length();
+                    //noinspection ResultOfMethodCallIgnored
+                    boolean ok = f.delete();
+                    if (ok) freed += len;
+                    SetupState.indeterminate = false;
+                    SetupState.percent = total > 0 ? Math.min(99, (int) ((i + 1) * 99.0 / total)) : 99;
+                    SetupState.stage = "清理安装包缓存";
+                    SetupState.detail = "已删除 " + (i + 1) + " / " + total + " 个包  ·  "
+                            + Downloader.fmt(freed) + " / " + Downloader.fmt(totalBytes);
+                }
+            } catch (Throwable ignored) {
             }
+            SetupState.running = false;
+            SetupState.indeterminate = false;
+            SetupState.percent = 0;
             final long freedMb = freed;
             runOnUiThread(() -> {
                 Toast.makeText(this, "已清理安装包缓存 " + Downloader.fmt(freedMb), Toast.LENGTH_LONG).show();
@@ -317,26 +345,72 @@ public class MainActivity extends Activity {
         new android.app.AlertDialog.Builder(this)
                 .setTitle("卸载已安装的 PyCharm")
                 .setMessage("删除 /opt/pycharm 与版本标记（约 2~4 GB）。系统镜像（rootfs）和 apt 依赖保留，之后可只重装 IDE。")
-                .setPositiveButton("卸载", (d, w) -> new Thread(() -> {
-                    String msg;
-                    try {
-                        Proot.run(this, "rm -rf /opt/pycharm");
-                        msg = "已卸载 PyCharm";
-                    } catch (Exception e) {
-                        msg = "卸载失败：" + e.getMessage();
-                    }
-                    //noinspection ResultOfMethodCallIgnored
-                    Dirs.ideReadyMark(this).delete();
-                    //noinspection ResultOfMethodCallIgnored
-                    Dirs.ideVersionMark(this).delete();
-                    final String m = msg;
-                    runOnUiThread(() -> {
-                        Toast.makeText(this, m, Toast.LENGTH_LONG).show();
-                        refresh();
-                    });
-                }, "uninstall").start())
+                .setPositiveButton("卸载", (d, w) -> {
+                    SetupState.running = true;
+                    SetupState.operation = "卸载";
+                    SetupState.percent = 0;
+                    SetupState.indeterminate = false;
+                    SetupState.error = false;
+                    SetupState.stage = "准备卸载 PyCharm";
+                    SetupState.detail = "正在扫描 /opt/pycharm…";
+                    refresh();
+                    new Thread(() -> {
+                        String msg;
+                        try {
+                            java.io.File ide = new java.io.File(Dirs.rootfs(MainActivity.this), "opt/pycharm");
+                            deleteIdePath(ide, "卸载 PyCharm", 2, 95);
+                            deleteIdePath(new java.io.File(Dirs.rootfs(MainActivity.this), "opt/.extract"),
+                                    "清理临时目录", 97, 1);
+                            deleteIdePath(new java.io.File(Dirs.rootfs(MainActivity.this), "opt/.extract_java"),
+                                    "清理临时目录", 98, 1);
+                            msg = "已卸载 PyCharm";
+                        } catch (Throwable t) {
+                            msg = "卸载失败：" + t.getMessage();
+                        }
+                        //noinspection ResultOfMethodCallIgnored
+                        Dirs.ideReadyMark(MainActivity.this).delete();
+                        //noinspection ResultOfMethodCallIgnored
+                        Dirs.ideVersionMark(MainActivity.this).delete();
+                        SetupState.running = false;
+                        SetupState.indeterminate = false;
+                        SetupState.percent = 0;
+                        SetupState.stage = "卸载完成";
+                        final String m = msg;
+                        runOnUiThread(() -> {
+                            Toast.makeText(MainActivity.this, m, Toast.LENGTH_LONG).show();
+                            refresh();
+                        });
+                    }, "uninstall").start();
+                })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /** 卸载/清理目录：扫描阶段不确定进度，删除阶段按字节推进 */
+    private void deleteIdePath(java.io.File target, String label, int fromPct, int spanPct) {
+        if (target == null || !target.exists()) return;
+        SetupState.indeterminate = true;
+        SetupState.stage = label;
+        SetupState.detail = "正在统计文件与体积…";
+        Io.rmRf(target, new Io.DeleteProgress() {
+            @Override public void onScan(long files, long bytes) {
+                SetupState.indeterminate = true;
+                SetupState.stage = label;
+                SetupState.detail = "已扫描 " + files + " 个文件 · " + Downloader.fmt(bytes);
+            }
+
+            @Override public void onDelete(long doneFiles, long totalFiles, long doneBytes, long totalBytes) {
+                double frac = totalBytes > 0 ? Math.min(1.0, (double) doneBytes / totalBytes)
+                        : (totalFiles > 0 ? Math.min(1.0, (double) doneFiles / totalFiles) : 1.0);
+                SetupState.indeterminate = false;
+                SetupState.percent = Math.min(99, fromPct + (int) (frac * spanPct));
+                SetupState.stage = label;
+                SetupState.detail = "已删除 " + doneFiles + " / " + totalFiles + " 个文件  ·  "
+                        + Downloader.fmt(doneBytes) + " / " + Downloader.fmt(totalBytes)
+                        + "  " + (int) (frac * 100) + "%";
+            }
+        });
+        SetupState.indeterminate = false;
     }
 
     private int dp(int v) {
@@ -376,11 +450,11 @@ public class MainActivity extends Activity {
     private void refresh() {
         boolean ready = isReady();
         bar.setProgress(SetupState.percent);
-        bar.setIndeterminate(SetupState.running && SetupState.percent <= 0);
+        bar.setIndeterminate(SetupState.indeterminate || (SetupState.running && SetupState.percent <= 0));
 
         String s;
         if (SetupState.running) {
-            s = "安装中：" + SetupState.stage + "（" + SetupState.percent + "%）";
+            s = SetupState.operation + "中：" + SetupState.stage + "（" + SetupState.percent + "%）";
             if (!SetupState.detail.isEmpty()) s += "\n" + SetupState.detail;
         } else if (SetupState.error) {
             s = "安装失败：" + SetupState.errorText;
@@ -408,13 +482,13 @@ public class MainActivity extends Activity {
 
         install.setEnabled(!SetupState.running);
         launch.setEnabled(ready && !SetupState.running);
-        display.setEnabled(ready);
+        display.setEnabled(ready && !SetupState.running);
         stop.setEnabled(IdeService.RUNNING);
         version.setEnabled(!SetupState.running);
         heap.setEnabled(!SetupState.running);
         install.setAlpha(SetupState.running ? 0.45f : 1f);
         launch.setAlpha(ready && !SetupState.running ? 1f : 0.45f);
-        display.setAlpha(ready ? 1f : 0.45f);
+        display.setAlpha(ready && !SetupState.running ? 1f : 0.45f);
         stop.setAlpha(IdeService.RUNNING ? 1f : 0.45f);
         heap.setAlpha(SetupState.running ? 0.45f : 1f);
 

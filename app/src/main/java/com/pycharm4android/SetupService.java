@@ -58,7 +58,9 @@ public class SetupService extends Service {
     /** 单独装 PyCharm：进度区间单独算，避免与整机安装混淆 */
     private void doIdeOnly() {
         SetupState.running = true;
+        SetupState.operation = "安装";
         SetupState.error = false;
+        SetupState.indeterminate = false;
         SetupState.cancel.set(false);
         PowerManager pm = getSystemService(PowerManager.class);
         if (pm != null) {
@@ -92,6 +94,7 @@ public class SetupService extends Service {
             notify("安装失败：" + t.getMessage(), 0);
         } finally {
             SetupState.running = false;
+            SetupState.indeterminate = false;
             RUNNING = false;
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
             stopForeground(true);
@@ -106,7 +109,7 @@ public class SetupService extends Service {
                 .setContentText(text)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setProgress(100, Math.max(percent, 0), percent <= 0)
+                .setProgress(100, Math.max(percent, 0), SetupState.indeterminate || percent <= 0)
                 .build();
     }
 
@@ -129,7 +132,9 @@ public class SetupService extends Service {
 
     private void doSetup() {
         SetupState.running = true;
+        SetupState.operation = "安装";
         SetupState.error = false;
+        SetupState.indeterminate = false;
         SetupState.cancel.set(false);
         PowerManager pm = getSystemService(PowerManager.class);
         if (pm != null) {
@@ -164,6 +169,7 @@ public class SetupService extends Service {
             notify("安装失败：" + t.getMessage(), 0);
         } finally {
             SetupState.running = false;
+            SetupState.indeterminate = false;
             RUNNING = false;
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         }
@@ -182,6 +188,7 @@ public class SetupService extends Service {
         double frac = total > 0 ? Math.min(1.0, (double) done / total) : 0;
         SetupState.percent = fromPct + (int) (frac * spanPct);
         SetupState.stage = label;
+        SetupState.indeterminate = false;
         SetupState.detail = Downloader.fmt(done) + (total > 0 ? " / " + Downloader.fmt(total) : "")
                 + (total > 0 ? "  " + (int) (frac * 100) + "%" : "")
                 + (speed > 0 ? "  ·  " + Downloader.fmt(speed) + "/s" : "")
@@ -191,6 +198,75 @@ public class SetupService extends Service {
             lastNotifyAt = now;
             notify(label + " " + SetupState.detail, SetupState.percent);
         }
+    }
+
+    private static long lastFsNotifyAt = 0;
+
+    /** 解包进度：压缩包已读字节 -> 全局百分比区间；UI 400ms 轮询，通知 1s 节流 */
+    private void onExtractProgress(String label, int fromPct, int spanPct,
+                                   long done, long total, String current) {
+        double frac = total > 0 ? Math.min(1.0, (double) done / total) : 0;
+        int pct = fromPct + (int) (frac * spanPct);
+        SetupState.percent = Math.min(99, pct);
+        SetupState.stage = label;
+        SetupState.indeterminate = false;
+        String name = baseName(current);
+        SetupState.detail = Downloader.fmt(done) + (total > 0 ? " / " + Downloader.fmt(total) : "")
+                + (total > 0 ? "  " + (int) (frac * 100) + "%" : "")
+                + (name.isEmpty() ? "" : "  ·  " + name);
+        long now = System.currentTimeMillis();
+        if (now - lastFsNotifyAt >= 1000) {
+            lastFsNotifyAt = now;
+            notify(label + " " + SetupState.detail, SetupState.percent);
+        }
+    }
+
+    /** 删除目录并显示“统计 -> 删除”两阶段进度 */
+    private void deleteWithProgress(File target, String label, int fromPct, int spanPct) {
+        if (target == null || !target.exists()) return;
+        SetupState.indeterminate = true;
+        SetupState.percent = fromPct;
+        SetupState.stage = label;
+        SetupState.detail = "正在统计文件与体积…";
+        notify(label + " · 正在统计…", fromPct);
+        Io.rmRf(target, new Io.DeleteProgress() {
+            @Override public void onScan(long files, long bytes) {
+                SetupState.indeterminate = true;
+                SetupState.percent = fromPct;
+                SetupState.stage = label;
+                SetupState.detail = "已扫描 " + files + " 个文件 · " + Downloader.fmt(bytes);
+                notifyFs(label + " · 统计 " + files + " 个文件", fromPct);
+            }
+
+            @Override public void onDelete(long doneFiles, long totalFiles, long doneBytes, long totalBytes) {
+                double frac = totalBytes > 0 ? Math.min(1.0, (double) doneBytes / totalBytes)
+                        : (totalFiles > 0 ? Math.min(1.0, (double) doneFiles / totalFiles) : 1.0);
+                int pct = fromPct + (int) (frac * spanPct);
+                SetupState.indeterminate = false;
+                SetupState.percent = Math.min(99, pct);
+                SetupState.stage = label;
+                SetupState.detail = "已删除 " + doneFiles + " / " + totalFiles + " 个文件  ·  "
+                        + Downloader.fmt(doneBytes) + " / " + Downloader.fmt(totalBytes)
+                        + "  " + (int) (frac * 100) + "%";
+                notifyFs(label + " " + (int) (frac * 100) + "%", SetupState.percent);
+            }
+        });
+        SetupState.indeterminate = false;
+    }
+
+    private void notifyFs(String text, int pct) {
+        long now = System.currentTimeMillis();
+        if (now - lastFsNotifyAt < 1000) return;
+        lastFsNotifyAt = now;
+        notify(text, pct);
+    }
+
+    private static String baseName(String path) {
+        if (path == null || path.isEmpty()) return "";
+        int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        String name = slash >= 0 ? path.substring(slash + 1) : path;
+        if (name.length() > 36) name = "…" + name.substring(name.length() - 35);
+        return name;
     }
 
     private void extractRuntime() throws Exception {
@@ -231,7 +307,7 @@ public class SetupService extends Service {
                 return;
             } catch (IOException e) {
                 LogBus.append("[rootfs] 现有镜像损坏：" + e.getMessage() + "，将重新解包");
-                Io.rmRf(rootfs);
+                deleteWithProgress(rootfs, "清理损坏镜像", 6, 1);
                 //noinspection ResultOfMethodCallIgnored
                 Dirs.rootfsReadyMark(this).delete();
             }
@@ -256,23 +332,25 @@ public class SetupService extends Service {
         }
         if (!tgz.exists()) downloadRootfs(tgz);
 
-        step("解包系统镜像", 25);
+        step("解包系统镜像", 20);
         for (int attempt = 1; ; attempt++) {
             checkCancel();
-            Io.rmRf(rootfs);
+            deleteWithProgress(rootfs, "清理旧系统镜像", 18, 2);
             try {
-                TarGz.extract(tgz, rootfs);
+                TarGz.extract(tgz, rootfs, (done, total, current) ->
+                        onExtractProgress("解包系统镜像", 20, 6, done, total, current));
                 if (!new File(rootfs, "bin/bash").exists()) throw new IOException("rootfs 解包不完整");
+                step("校验系统镜像结构", 27);
                 Rootfs.verify(this);
                 break;
             } catch (IOException e) {
                 LogBus.append("[rootfs] 解包失败（第 " + attempt + " 次）：" + e.getMessage());
-                Io.rmRf(rootfs);
+                deleteWithProgress(rootfs, "清理损坏镜像", 20, 2);
                 if (attempt >= 2) throw new Exception("系统镜像两次解包均失败：" + e.getMessage() + "，请换下载源后重试");
                 Io.rmRf(tgz); // 视为损坏，整包重下
-                step("重新下载系统镜像", 20);
+                step("重新下载系统镜像", 8);
                 downloadRootfs(tgz);
-                step("重新解包系统镜像", 25);
+                step("重新解包系统镜像", 20);
             }
         }
         //noinspection ResultOfMethodCallIgnored
@@ -285,7 +363,7 @@ public class SetupService extends Service {
         String[] urls = Mirrors.rootfsUrls(this);
         LogBus.append("[下载] 系统镜像候选源 " + urls.length + " 个，首选 " + Downloader.hostOf(urls[0]));
         Downloader.downloadVerified(urls, tgz,
-                (done, total, speed) -> onDownloadProgress("下载系统镜像", 8, 16, done, total, speed),
+                (done, total, speed) -> onDownloadProgress("下载系统镜像", 8, 12, done, total, speed),
                 SetupState.cancel, Const.ROOTFS_SHA256, Const.ROOTFS_MIN_BYTES);
     }
 
@@ -351,18 +429,22 @@ public class SetupService extends Service {
             downloadIde(tgz, ver, ideOnly);
         }
 
+        step("清理旧版 PyCharm", 80);
+        deleteWithProgress(ide, "清理旧版 PyCharm", 80, 1);
+        deleteWithProgress(new File(Dirs.rootfs(this), "opt/.extract"), "清理临时解包目录", 81, 1);
+        deleteWithProgress(new File(Dirs.rootfs(this), "opt/.extract_java"), "清理临时解包目录", 81, 0);
         step("解包 PyCharm " + ver.pretty(), 82);
-        int rc = extractIdeInContainer(tgz);
+        int rc = extractIdeInContainer(tgz, ver.pretty(), 82, 5);
         if (rc == 4) {                      // gzip 校验失败 => 包损坏，重下一次
             LogBus.append("[PyCharm] 压缩包校验失败，重新下载");
             Io.rmRf(tgz);
             downloadIde(tgz, ver, ideOnly);
-            rc = extractIdeInContainer(tgz);
+            rc = extractIdeInContainer(tgz, ver.pretty(), 82, 5);
         }
         if (rc != 0) {
             LogBus.append("[PyCharm] 容器内解包失败（exit " + rc + "），改用 Java 解包器");
             step("解包 PyCharm（Java）", 82);
-            if (!extractIdeInJava(tgz)) {
+            if (!extractIdeInJava(tgz, ver.pretty(), 82, 5)) {
                 Io.rmRf(tgz);
                 throw new Exception("PyCharm 解包失败（容器 exit " + rc + "，Java 亦失败），详见日志 TAR_RC/DF 行");
             }
@@ -383,8 +465,10 @@ public class SetupService extends Service {
         step("写入运行参数", ideOnly ? 90 : 88);
         HeapConfig.applyToRootfs(this);
         Proot.run(this,
-                "grep -q 'ide.no.platform.update' /opt/pycharm/bin/idea.properties || echo 'ide.no.platform.update=true' >> /opt/pycharm/bin/idea.properties; "
-                        + "chmod +x /opt/pycharm/bin/pycharm.sh");
+                "grep -q '^ide.no.platform.update=' /opt/pycharm/bin/idea.properties || echo 'ide.no.platform.update=true' >> /opt/pycharm/bin/idea.properties; "
+                        + "grep -q '^idea.filewatcher.disabled=' /opt/pycharm/bin/idea.properties || echo 'idea.filewatcher.disabled=true' >> /opt/pycharm/bin/idea.properties; "
+                        + "chmod +x /opt/pycharm/bin/pycharm.sh 2>/dev/null; "
+                        + "[ -f /opt/pycharm/bin/pycharm ] && chmod +x /opt/pycharm/bin/pycharm 2>/dev/null; true");
         Io.writeText(Dirs.ideVersionMark(this), version);
         step("准备就绪", ideOnly ? 96 : 96);
     }
@@ -429,23 +513,94 @@ public class SetupService extends Service {
      * 容器内解包，返回 shell 退出码：0 成功 / 4 gzip 损坏 / 5 tar 失败 / 6 未找到 pycharm.sh / 其他为 bash 错误。
      * 全程打印诊断：文件列表、空间、inode、tar/gzip 版本、gzip -t、tar 输出的最后 40 行。
      */
-    private int extractIdeInContainer(File tgz) throws Exception {
+    private int extractIdeInContainer(File tgz, String label, int fromPct, int spanPct) throws Exception {
         File sh = new File(Dirs.runtime(this), "extract-ide.sh");
         Io.copyAsset(this, "scripts/extract-ide.sh", sh);
         Io.chmod(sh.getPath(), 0755);
-        LogBus.append("[解包] 使用 /opt/host/extract-ide.sh 解包 " + tgz.getName());
-        return Proot.run(this, "/opt/host/extract-ide.sh /root/dl/" + tgz.getName());
+        File phaseLog = new File(Dirs.runtime(this), "extract-progress.log");
+        //noinspection ResultOfMethodCallIgnored
+        phaseLog.delete();
+        long totalBytes = TarGz.uncompressedSize(tgz);
+        if (totalBytes <= 0) totalBytes = tgz.length() * 4;
+        LogBus.append("[解包] 使用 /opt/host/extract-ide.sh 解包 " + tgz.getName()
+                + "，总解压量约 " + Downloader.fmt(totalBytes));
+
+        final long recordBytes = 1000L * 512L;   // --checkpoint=1000 对应 1000 个 512B 记录
+        final long estimatedTotal = totalBytes;
+        final boolean[] monitorRunning = {true};
+        Thread monitor = new Thread(() -> {
+            while (monitorRunning[0]) {
+                String phase = "VERIFY";
+                long doneBytes = 0;
+                String content = Io.readAll(phaseLog);
+                if (!content.isEmpty()) {
+                    for (String line : content.split("\n")) {
+                        line = line.trim();
+                        if (line.startsWith("PHASE ")) {
+                            phase = line.substring(6).trim();
+                        } else {
+                            int idx = line.indexOf("TAR_PROGRESS");
+                            if (idx >= 0) {
+                                try {
+                                    long cp = Long.parseLong(line.substring(idx + 12).trim());
+                                    doneBytes = Math.min(estimatedTotal, cp * recordBytes);
+                                } catch (NumberFormatException ignored) {}
+                            }
+                        }
+                    }
+                }
+                int pct;
+                if (phase.startsWith("EXTRACT")) {
+                    double frac = estimatedTotal > 0 ? Math.min(1.0, (double) doneBytes / estimatedTotal) : 0;
+                    pct = Math.min(99, fromPct + (int) (frac * spanPct));
+                    SetupState.indeterminate = false;
+                    SetupState.stage = "解包 PyCharm " + label;
+                    SetupState.detail = Downloader.fmt(doneBytes) + " / " + Downloader.fmt(estimatedTotal)
+                            + "  " + (int) (frac * 100) + "%  ·  容器内 tar";
+                    notifyFs("解包 PyCharm " + label + " " + (int) (frac * 100) + "%", pct);
+                } else if (phase.startsWith("MOVE")) {
+                    pct = Math.min(99, fromPct + spanPct);
+                    SetupState.indeterminate = true;
+                    SetupState.percent = pct;
+                    SetupState.stage = "整理 PyCharm 目录";
+                    SetupState.detail = "解包完成，正在移动到 /opt/pycharm";
+                    notifyFs("整理 PyCharm 目录", pct);
+                } else {
+                    pct = fromPct;
+                    SetupState.indeterminate = true;
+                    SetupState.percent = pct;
+                    SetupState.stage = "校验 PyCharm 压缩包";
+                    SetupState.detail = "gzip 完整性校验中 · " + Downloader.fmt(tgz.length());
+                    notifyFs("校验 PyCharm 压缩包", pct);
+                }
+                SetupState.percent = pct;
+                try { Thread.sleep(800); } catch (InterruptedException ignored) { break; }
+            }
+            SetupState.indeterminate = false;
+        }, "extract-progress");
+
+        monitor.start();
+        try {
+            return Proot.run(this, "/opt/host/extract-ide.sh /root/dl/" + tgz.getName());
+        } finally {
+            monitorRunning[0] = false;
+            monitor.interrupt();
+            try { monitor.join(3000); } catch (InterruptedException ignored) {}
+            //noinspection ResultOfMethodCallIgnored
+            phaseLog.delete();
+        }
     }
 
     /** 不依赖容器 tar：用纯 Java TarGz 解到 rootfs/opt/.extract_java，再改名为 opt/pycharm */
-    private boolean extractIdeInJava(File tgz) {
+    private boolean extractIdeInJava(File tgz, String label, int fromPct, int spanPct) {
         File tmp = new File(Dirs.rootfs(this), "opt/.extract_java");
         File ide = new File(Dirs.rootfs(this), "opt/pycharm");
         try {
             Io.rmRf(tmp);
             Io.rmRf(ide);
             long t0 = System.currentTimeMillis();
-            TarGz.extract(tgz, tmp);
+            TarGz.extract(tgz, tmp, (done, total, current) ->
+                    onExtractProgress("解包 PyCharm " + label, fromPct, spanPct, done, total, current));
             File root = findPycharmRoot(tmp, 0);
             if (root == null) {
                 LogBus.append("[解包] Java 解包后未找到 bin/pycharm.sh");

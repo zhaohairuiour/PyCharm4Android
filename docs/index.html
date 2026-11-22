@@ -123,6 +123,7 @@ h1 .accent {
 .dock .primary2 { background:linear-gradient(100deg,var(--cyan),var(--blue)); color:#03121f; border:0; font-weight:700; }
 
 section { padding:74px 0; }
+section[id] { scroll-margin-top:76px; }
 .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:28px; }
 .eyebrow { color:var(--cyan); font:600 10px/1.4 ui-monospace,monospace; letter-spacing:.24em; }
 h2 { font-size:clamp(26px,3.2vw,38px); margin:8px 0 0; letter-spacing:-.025em; }
@@ -192,12 +193,88 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 .toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%,20px); background:#0f1a2c; border:1px solid rgba(0,229,255,.45); color:#c9f7ff; padding:10px 16px; border-radius:999px; font-size:12px; opacity:0; pointer-events:none; transition:.2s; z-index:99; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
 
+/* scroll reveal */
+.reveal { opacity:0; transform:translateY(26px) scale(.985); transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1); }
+.reveal.in { opacity:1; transform:none; }
+@media (prefers-reduced-motion:reduce) {
+  .reveal { opacity:1; transform:none; transition:none; }
+}
+
+/* virtual demo */
+#demo { padding-top:24px; }
+.demo-wrap { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(230px,.45fr); gap:18px; align-items:stretch; }
+.demo-stage { position:relative; border:1px solid var(--line); border-radius:24px; padding:18px; background:radial-gradient(600px 360px at 78% 0%,rgba(0,229,255,.08),transparent 70%),rgba(7,12,22,.72); overflow:hidden; }
+.demo-stage::after { content:""; position:absolute; inset:auto -10% -50% 30%; height:70%; background:radial-gradient(ellipse,rgba(61,123,255,.16),transparent 65%); pointer-events:none; }
+.demo-bezel { position:relative; z-index:2; border-radius:24px; padding:8px; background:linear-gradient(160deg,#182740,#060a12); border:1px solid rgba(0,229,255,.22); box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 42px rgba(0,180,255,.09); }
+.demo-screen { position:relative; aspect-ratio:16/9; overflow:hidden; border-radius:17px; background:#05080f; border:1px solid #14213a; }
+.demo-installer { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; justify-content:center; padding:clamp(14px,4vw,32px); background:radial-gradient(520px 300px at 18% 0%,rgba(0,229,255,.14),transparent 65%),linear-gradient(160deg,#071426,#05080f 70%); transition:opacity .65s ease,transform .65s ease; }
+.demo-installer.hide { opacity:0; transform:scale(1.03); pointer-events:none; }
+.demo-kicker { font:600 clamp(7px,1vw,10px)/1.4 ui-monospace,monospace; color:var(--cyan); letter-spacing:.2em; display:flex; gap:8px; align-items:center; }
+.demo-kicker .spin { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); animation:pulse 1.4s infinite; }
+@keyframes pulse { 0%,100%{transform:scale(.8);opacity:.6} 50%{transform:scale(1.15);opacity:1} }
+.demo-h { margin:10px 0 4px; font-size:clamp(17px,2.8vw,28px); letter-spacing:-.03em; }
+.demo-sub { color:var(--muted); font-size:clamp(9px,1.1vw,11px); line-height:1.6; margin:0 0 clamp(10px,2vw,18px); }
+.demo-stage-name { display:flex; justify-content:space-between; gap:12px; align-items:baseline; font:600 clamp(9px,1.2vw,11px)/1.4 ui-monospace,monospace; color:#cdefff; margin-bottom:7px; }
+.demo-stage-name span:last-child { color:var(--cyan); }
+.demo-bar { height:clamp(7px,1vw,10px); border-radius:999px; background:#0b1a2b; border:1px solid #17314b; overflow:hidden; }
+.demo-bar i { display:block; width:0%; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--cyan),var(--blue)); box-shadow:0 0 18px rgba(0,229,255,.45); transition:width .12s linear; }
+.demo-detail { margin-top:7px; color:var(--dim); font:clamp(8px,1vw,10px)/1.5 ui-monospace,monospace; display:flex; justify-content:space-between; gap:8px; }
+.demo-log { margin-top:clamp(9px,1.5vw,15px); min-height:2.8em; color:#6f88a8; font:clamp(7px,1vw,9px)/1.6 ui-monospace,monospace; white-space:pre-line; }
+.demo-log b { color:var(--green); font-weight:600; }
+.demo-ide { position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; background:#1e1f22; opacity:0; transform:translateY(10px) scale(.985); transition:opacity .65s ease,transform .65s ease; pointer-events:none; }
+.demo-ide.show { opacity:1; transform:none; }
+.demo-titlebar { height:clamp(24px,3.6vw,34px); flex:0 0 auto; display:flex; align-items:center; gap:7px; padding:0 10px; background:#2b2d30; border-bottom:1px solid #3c3f41; font-size:clamp(7px,1vw,10px); color:#dfe3e8; }
+.demo-titlebar .ico { width:15px; height:15px; border-radius:4px; background:linear-gradient(135deg,var(--cyan),var(--blue)); }
+.demo-titlebar .title { flex:1; text-align:center; }
+.demo-titlebar .lights { display:flex; gap:7px; color:#c9cdd3; }
+.demo-titlebar .lights .x { color:#ff5370; }
+.demo-main { flex:1; min-height:0; display:flex; }
+.demo-sidebar { width:9%; background:#1e1f22; border-right:1px solid #2b2d30; padding:8px 6px; }
+.demo-sidebar i { display:block; height:4px; border-radius:3px; background:#3a3d42; margin:8px 0; }
+.demo-sidebar i:first-child { background:rgba(0,229,255,.55); width:80%; }
+.demo-tree { width:24%; background:#1e1f22; border-right:1px solid #2b2d30; padding:9px 8px; color:#8fa6c4; font:clamp(6.5px,.9vw,9px)/1.9 ui-monospace,monospace; }
+.demo-tree p { margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.demo-tree .cyan { color:#7de9ff; }
+.demo-tree .green { color:#8dffc6; }
+.demo-code { flex:1; background:#1e1f22; padding:8px 10px; overflow:hidden; color:#c9d1d9; font:clamp(6.5px,.95vw,9px)/1.85 ui-monospace,monospace; }
+.demo-code p { margin:0; white-space:pre; }
+.demo-code .ln { display:inline-block; width:2.2em; color:#4b5a6b; }
+.demo-code .kw { color:#ff9d5c; }
+.demo-code .str { color:#8dffc6; }
+.demo-code .fn { color:#7de9ff; }
+.demo-code .com { color:#5a7395; }
+.demo-dock { position:absolute; z-index:6; left:8px; right:8px; bottom:8px; display:flex; gap:5px; align-items:center; padding:6px; border:1px solid #34373d; border-radius:12px; background:rgba(26,28,32,.96); box-shadow:0 8px 22px rgba(0,0,0,.35); transition:transform .55s cubic-bezier(.2,.8,.2,1),opacity .55s; }
+.demo-dock span { padding:5px 8px; border-radius:999px; border:1px solid #3b3e44; background:#2a2d31; color:#d9e8f5; font-size:clamp(6.5px,.86vw,8.5px); white-space:nowrap; }
+.demo-dock span.hot { background:linear-gradient(100deg,var(--cyan),var(--blue)); color:#03121f; border:0; font-weight:700; }
+.demo-dock .collapse { cursor:pointer; border-color:#527b94; color:#b9f4ff; }
+.demo-dock .collapse.press { transform:scale(.92); background:rgba(0,229,255,.22); }
+.demo-dock.collapsed { transform:translateY(135%); opacity:0; }
+.demo-reopen { position:absolute; z-index:5; left:50%; bottom:8px; transform:translate(-50%,18px); opacity:0; padding:5px 11px; border-radius:999px; border:1px solid #527b94; background:rgba(26,28,32,.96); color:#b9f4ff; font:600 clamp(7px,.9vw,9px)/1 ui-monospace,monospace; transition:.4s ease; }
+.demo-reopen.show { transform:translate(-50%,0); opacity:1; }
+.demo-toast { position:absolute; z-index:7; right:8px; top:clamp(30px,4.5vw,44px); width:min(52%,260px); padding:7px 9px; border-radius:8px; border:1px solid rgba(65,227,160,.3); background:rgba(15,26,44,.96); color:#c9f7ff; font-size:clamp(7px,.86vw,9px); line-height:1.5; box-shadow:0 10px 28px rgba(0,0,0,.35); opacity:0; transform:translateY(-8px); transition:.45s ease; }
+.demo-toast.show { opacity:1; transform:none; }
+.demo-toast b { color:var(--green); }
+.demo-cursor { position:absolute; z-index:9; width:20px; opacity:0; pointer-events:none; transition:left .7s cubic-bezier(.2,.8,.2,1),top .7s cubic-bezier(.2,.8,.2,1),opacity .25s; filter:drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+.demo-cursor.show { opacity:1; }
+.demo-cursor svg { display:block; width:100%; height:auto; }
+.demo-side { display:flex; flex-direction:column; gap:10px; }
+.demo-point { padding:14px 16px; border-radius:16px; border:1px solid var(--line); background:rgba(10,18,34,.55); transition:.25s ease; }
+.demo-point.active { border-color:rgba(0,229,255,.45); background:rgba(0,229,255,.07); box-shadow:0 0 28px rgba(0,180,255,.08); }
+.demo-point .n { font:700 9px/1 ui-monospace,monospace; color:var(--cyan); letter-spacing:.14em; }
+.demo-point h3 { margin:8px 0 5px; font-size:14px; }
+.demo-point p { margin:0; color:var(--muted); font-size:11.5px; line-height:1.7; }
+.demo-replay { margin-top:auto; width:100%; justify-content:center; cursor:pointer; }
+.demo-note { color:var(--dim); font-size:10px; line-height:1.7; margin:0; }
+
 @media (max-width:900px) {
   .hero { grid-template-columns:1fr; padding-top:50px; }
   .phone { order:-1; }
   .grid4,.steps { grid-template-columns:repeat(2,1fr); }
   .shots { grid-template-columns:1fr; }
   .navlinks a:not(.ghost) { display:none; }
+  .demo-wrap { grid-template-columns:1fr; }
+  .demo-side { display:grid; grid-template-columns:repeat(3,1fr); }
+  .demo-replay,.demo-note { grid-column:1/-1; }
 }
 @media (max-width:560px) {
   .wrap { width:calc(100% - 28px); }
@@ -207,6 +284,11 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   .cta .btn { flex:1; justify-content:center; }
   h1 { font-size:40px; }
   .mockbody { height:390px; }
+  .demo-stage { padding:9px; }
+  .demo-side { grid-template-columns:1fr; }
+  .demo-point { padding:11px 13px; }
+  .demo-dock { gap:3px; padding:4px; }
+  .demo-dock span { padding:4px 5px; }
 }
 </style>
 </head>
@@ -214,6 +296,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 <div class="nav"><div class="wrap">
   <a class="brand" href="#top"><span class="logo">P</span><span>PyCharm for Android<small>ANDROID CONTAINER</small></span></a>
   <nav class="navlinks">
+    <a href="#demo">演示</a>
     <a href="#features">特性</a>
     <a href="#versions">版本</a>
     <a href="#install">安装</a>
@@ -229,12 +312,12 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
     <h1>把桌面版<br><span class="accent">PyCharm</span> 装进手机</h1>
     <p class="lead">不是远程开发，也不是阉割客户端。APK 内置一套 Ubuntu arm64 用户态，proot 免 root 运行 JetBrains 官方 PyCharm，Xvfb 出图、x11vnc 推流，自研原生 RFB 客户端直接绘帧。</p>
     <div class="cta">
-      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.9-arm64.apk" download>下载最新版 v1.9.9 ↓</a>
+      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.11.0-arm64.apk" download>下载最新版 v1.11.0 ↓</a>
       <a id="ghlink2" class="btn secondary" href="https://github.com/" target="_blank" rel="noopener">查看源码</a>
     </div>
-    <div class="meta"><span>APK 280 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 7cfb6f42baa6…</span><span>镜像源 · GitProxy</span></div>
+    <div class="meta"><span>APK 285 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 1724137332ee…</span><span>镜像源 · GitProxy</span></div>
     <div class="stats">
-      <div class="stat"><b>26</b><span>个历史版本</span></div>
+      <div class="stat"><b>27</b><span>个历史版本</span></div>
       <div class="stat"><b>0</b><span>root 权限要求</span></div>
       <div class="stat"><b>Raw</b><span>原生 RFB 渲染</span></div>
       <div class="stat"><b>5901</b><span>固定 VNC 端口</span></div>
@@ -261,6 +344,44 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   </div>
 </div>
 
+<section id="demo"><div class="wrap">
+  <div class="section-head"><div><div class="eyebrow">// VIRTUAL DEMO</div><h2>看一遍安装与控制坞</h2></div><p>纯前端虚拟演示，不是实机录屏。展示解包进度、原生启动器提示和底部控制栏收起。</p></div>
+  <div class="demo-wrap reveal">
+    <div class="demo-stage">
+      <div class="demo-bezel"><div class="demo-screen" id="demoScreen">
+        <div class="demo-installer" id="demoInstaller">
+          <div class="demo-kicker"><span class="spin"></span> PROOT CONTAINER · ARM64</div>
+          <h3 class="demo-h">正在部署 PyCharm 运行时</h3>
+          <p class="demo-sub">Ubuntu 24.04 rootfs · Xvfb + x11vnc · 免 root</p>
+          <div class="demo-stage-name"><span id="demoStage">解包系统镜像</span><span id="demoPercent">0%</span></div>
+          <div class="demo-bar"><i id="demoBar"></i></div>
+          <div class="demo-detail"><span id="demoBytes">0 / 2.4 GB</span><span id="demoFile">rootfs/bin/bash</span></div>
+          <div class="demo-log" id="demoLog">校验 SHA-256 通过<br><b>开始解包</b> · 已写入 0 个文件</div>
+        </div>
+        <div class="demo-ide" id="demoIde">
+          <div class="demo-titlebar"><span class="ico"></span><span class="title">PyCharm 2025.3 · Welcome</span><span class="lights"><span>—</span><span>▢</span><span class="x">×</span></span></div>
+          <div class="demo-main">
+            <div class="demo-sidebar"><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="demo-tree"><p class="cyan">PyCharmMiscProject</p><p>▾ .venv</p><p>▸ External Libraries</p><p>▸ Scratches</p><p class="green">✓ main.py</p></div>
+            <div class="demo-code"><p><span class="ln">1</span><span class="kw">def</span> <span class="fn">hello</span>():</p><p><span class="ln">2</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">print</span>(<span class="str">"PyCharm on Android"</span>)</p><p><span class="ln">3</span></p><p><span class="ln">4</span><span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:</p><p><span class="ln">5</span>&nbsp;&nbsp;&nbsp;&nbsp;hello()</p><p><span class="ln">6</span></p><p><span class="com"># RFB 5901 · 1280×800 · sensorLandscape</span></p></div>
+          </div>
+          <div class="demo-toast" id="demoToast"><b>file watcher 已禁用</b><br>外部改动改用手动 Reload All from Disk</div>
+          <div class="demo-dock" id="demoDock"><span class="collapse" id="demoCollapse">收起 ▾</span><span class="hot">键盘</span><span>中文</span><span>日志</span><span>诊断</span><span>重连</span><span>←</span><span>→</span><span>适配</span></div>
+          <span class="demo-reopen" id="demoReopen">控制栏 ▲</span>
+        </div>
+        <div class="demo-cursor" id="demoCursor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2l14 10-6 1 3 7-2 1-3-7-6 4z" fill="#eaf6ff" stroke="#0b1322" stroke-width="1.5"/></svg></div>
+      </div></div>
+    </div>
+    <aside class="demo-side">
+      <div class="demo-point active" data-demo-step="0"><div class="n">01 / PROGRESS</div><h3>解包与删除有进度</h3><p>rootfs 与 PyCharm 解包显示压缩包字节、当前文件；卸载时先统计再按字节删除。</p></div>
+      <div class="demo-point" data-demo-step="1"><div class="n">02 / LAUNCHER</div><h3>原生启动器</h3><p>优先 <code>bin/pycharm</code>，缺失才回退脚本，消除脚本启动器提示。</p></div>
+      <div class="demo-point" data-demo-step="2"><div class="n">03 / DOCK</div><h3>控制坞可收起</h3><p>「收起 ▾」后画布扩展，底部保留「控制栏 ▲」随时展开。</p></div>
+      <button class="btn secondary demo-replay" id="demoReplay" type="button">重播演示 ↻</button>
+      <p class="demo-note">虚拟演示，非实机录屏；动画用于说明交互与进度形态。</p>
+    </aside>
+  </div>
+</div></section>
+
 <section id="features"><div class="wrap">
   <div class="section-head"><div><div class="eyebrow">// CAPABILITIES</div><h2>桌面级 IDE，移动端形态</h2></div><p>把 Linux 运行时、X 服务和渲染通道全部塞进一个 APK，安装后按需下载镜像与 IDE。</p></div>
   <div class="grid4">
@@ -284,7 +405,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 </div></section>
 
 <section id="versions"><div class="wrap">
-  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 26 个版本</h2></div><p>从 1.0.0 到 1.9.9，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
+  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 27 个版本</h2></div><p>从 1.0.0 到 1.11.0，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
   <div class="lines">
     <span class="label">下载线路</span>
     <button class="line-switch active" type="button" data-line="mirror">GitProxy 镜像</button>
@@ -296,7 +417,14 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
       <thead><tr><th>版本</th><th>构建日期</th><th>体积</th><th>SHA-256</th><th></th></tr></thead>
       <tbody>
         <tr>
-          <td><span class="ver">v1.9.9</span> <span class="tag">LATEST</span></td>
+          <td><span class="ver">v1.11.0</span> <span class="tag">LATEST</span></td>
+          <td class="muted">2026-11-22</td>
+          <td class="muted">285 KB</td>
+          <td><code data-sha="1724137332ee0af25d1cd18021bca4ebfc01f8dfdaa23f0423bd10e72f53ef76">1724137332ee…</code></td>
+          <td><a class="dl" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.11.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.9.9</span></td>
           <td class="muted">2026-11-21</td>
           <td class="muted">280 KB</td>
           <td><code data-sha="7cfb6f42baa6521df135923920c197737ff4f2eef6a747f41273ec0086f83dae">7cfb6f42baa6521d…</code></td>
@@ -508,6 +636,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <details><summary>为什么首次启动很慢？</summary><p>要等 Xvfb 就绪、JBR 冷启动、PyCharm 索引初始化。7 GB 内存设备建议只开一个项目，社区版比专业版轻。</p></details>
   <details><summary>专业版需要账号吗？</summary><p>需要。专业版首次启动会要求登录 JetBrains 账号激活，含 30 天试用；社区版免费，无需账号。</p></details>
   <details><summary>支持哪些设备？</summary><p>arm64 设备、Android 8.0+、至少 7 GB 内存；安装 IDE 需要 8 GB 以上空闲存储。x86 设备不适用。</p></details>
+  <details><summary>解包或卸载时会卡住吗？</summary><p>v1.11.0 起解包会显示压缩包字节、总量、百分比和当前文件；卸载先统计文件数/体积，再按删除字节推进。大目录首次扫描需要几秒，属于正常现象，系统会持续更新进度。</p></details>
   <details><summary>为什么端口固定 5901？</summary><p>display :1 的传统 VNC 端口。服务端和客户端都写死 5901，避免端口扫描带来的连接抖动。</p></details>
 </div></section>
 </main>
@@ -559,7 +688,159 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
       });
     });
   });
-  const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting) e.target.style.opacity=1; }),{threshold:.1});
+  /* 滚动揭示 */
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const revealTargets = [...document.querySelectorAll('.section-head,.card,.arch,.step,.shots,.tablewrap,#faq details,.demo-wrap,footer .wrap')];
+  revealTargets.forEach(el=>el.classList.add('reveal'));
+  document.querySelectorAll('.grid4,.steps').forEach(group=>{
+    [...group.children].forEach((el,i)=>el.style.transitionDelay=(i*70)+'ms');
+  });
+  if(reduceMotion || !('IntersectionObserver' in window)){
+    revealTargets.forEach(el=>el.classList.add('in'));
+  } else {
+    const revealIO=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){ entry.target.classList.add('in'); revealIO.unobserve(entry.target); }
+      });
+    },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+    revealTargets.forEach(el=>revealIO.observe(el));
+  }
+
+  /* 虚拟演示：安装进度 -> PyCharm -> 通知 -> 控制坞收起/展开 */
+  const demo={
+    screen:document.getElementById('demoScreen'),
+    installer:document.getElementById('demoInstaller'),
+    ide:document.getElementById('demoIde'),
+    bar:document.getElementById('demoBar'),
+    percent:document.getElementById('demoPercent'),
+    stage:document.getElementById('demoStage'),
+    bytes:document.getElementById('demoBytes'),
+    file:document.getElementById('demoFile'),
+    log:document.getElementById('demoLog'),
+    dock:document.getElementById('demoDock'),
+    collapse:document.getElementById('demoCollapse'),
+    reopen:document.getElementById('demoReopen'),
+    toast:document.getElementById('demoToast'),
+    cursor:document.getElementById('demoCursor'),
+    replay:document.getElementById('demoReplay'),
+    section:document.getElementById('demo')
+  };
+  if(demo.screen){
+    let demoTimers=[], demoRaf=0, demoLoop=0, demoPlaying=false, demoStarted=false, demoVisible=false;
+    const points=[...document.querySelectorAll('.demo-point')];
+    function demoClear(){
+      demoTimers.forEach(clearTimeout); demoTimers=[];
+      if(demoRaf) cancelAnimationFrame(demoRaf); demoRaf=0;
+    }
+    function demoStep(n){ points.forEach((el,i)=>el.classList.toggle('active',i===n)); }
+    function demoSet(pct,detail,file,stage){
+      demo.bar.style.width=Math.max(0,Math.min(100,pct))+'%';
+      demo.percent.textContent=Math.round(pct)+'%';
+      demo.bytes.textContent=detail;
+      demo.file.textContent=file;
+      if(stage) demo.stage.textContent=stage;
+    }
+    function demoAnimate(from,to,duration,onTick,done){
+      const t0=performance.now();
+      function frame(now){
+        const p=Math.min(1,(now-t0)/duration), e=1-Math.pow(1-p,3), v=from+(to-from)*e;
+        onTick(v);
+        if(p<1) demoRaf=requestAnimationFrame(frame);
+        else { demoRaf=0; if(done) done(); }
+      }
+      demoRaf=requestAnimationFrame(frame);
+    }
+    function demoMove(el){
+      const sr=demo.screen.getBoundingClientRect(), er=el.getBoundingClientRect();
+      demo.cursor.style.left=(er.left-sr.left+er.width*.42)+'px';
+      demo.cursor.style.top=(er.top-sr.top+er.height*.45)+'px';
+      demo.cursor.classList.add('show');
+    }
+    function demoReset(){
+      demoClear();
+      demo.installer.classList.remove('hide');
+      demo.ide.classList.remove('show');
+      demo.toast.classList.remove('show');
+      demo.dock.classList.remove('collapsed');
+      demo.reopen.classList.remove('show');
+      demo.cursor.classList.remove('show');
+      demoSet(0,'0 / 2.4 GB','rootfs/bin/bash','解包系统镜像');
+      demo.log.innerHTML='校验 SHA-256 通过<br><b>开始解包</b> · 已写入 0 个文件';
+      demoStep(0);
+      demoPlaying=true;
+    }
+    function demoAt(ms,fn){ demoTimers.push(setTimeout(fn,ms)); }
+    function demoStart(){
+      clearTimeout(demoLoop);
+      demoReset();
+      if(reduceMotion){
+        demo.installer.classList.add('hide');
+        demo.ide.classList.add('show');
+        demo.toast.classList.add('show');
+        demoStep(2);
+        demoSet(100,'5.0 / 5.0 GB','完成','安装完成');
+        demoPlaying=false;
+        return;
+      }
+      demoSet(0,'0 / 2.4 GB','rootfs/bin/bash','解包系统镜像');
+      demoAt(250,()=>demo.log.innerHTML='校验 SHA-256 通过<br><b>解包 rootfs</b> · 写入 bin/bash');
+      demoAnimate(0,38,1750,p=>{
+        const frac=p/38;
+        demoSet(p,(frac*2.4).toFixed(1)+' / 2.4 GB','rootfs/usr/lib','解包系统镜像');
+      },()=>{
+        demo.log.innerHTML='<b>rootfs 完成</b> · 42,681 个文件<br>开始解包 PyCharm 2025.3';
+      });
+      demoAt(1900,()=>{
+        demoSet(38,'0.0 / 2.6 GB','pycharm/bin','解包 PyCharm 2025.3');
+        demo.log.innerHTML='PHASE EXTRACT · tar checkpoint 1000<br><b>写入中</b> · 原生 tar';
+      });
+      demoAt(1980,()=>demoAnimate(38,100,2700,p=>{
+        const frac=(p-38)/62;
+        demoSet(p,(frac*2.6).toFixed(1)+' / 2.6 GB','pycharm/plugins','解包 PyCharm 2025.3');
+      },()=>{
+        demo.log.innerHTML='<b>解包完成</b> · 5.0 GB<br>启动 PyCharm 2025.3';
+      }));
+      demoAt(4880,()=>{
+        demo.installer.classList.add('hide');
+        demo.ide.classList.add('show');
+        demoStep(1);
+      });
+      demoAt(5450,()=>demo.toast.classList.add('show'));
+      demoAt(6350,()=>demoMove(demo.collapse));
+      demoAt(6660,()=>demo.collapse.classList.add('press'));
+      demoAt(6760,()=>{
+        demo.collapse.classList.remove('press');
+        demo.dock.classList.add('collapsed');
+        demo.reopen.classList.add('show');
+        demo.cursor.classList.remove('show');
+        demo.toast.classList.remove('show');
+        demoStep(2);
+      });
+      demoAt(8060,()=>demoMove(demo.reopen));
+      demoAt(8440,()=>{
+        demo.dock.classList.remove('collapsed');
+        demo.reopen.classList.remove('show');
+        demo.cursor.classList.remove('show');
+      });
+      demoAt(9300,()=>{
+        demoPlaying=false;
+        if(demoVisible) demoLoop=setTimeout(()=>{ if(demoVisible && !demoPlaying) demoStart(); },5200);
+      });
+    }
+    if(demo.replay) demo.replay.addEventListener('click',()=>{ demoStart(); });
+    if('IntersectionObserver' in window){
+      const demoIO=new IntersectionObserver(entries=>{
+        entries.forEach(e=>{ demoVisible=e.isIntersecting; });
+        if(demoVisible){
+          if(!demoStarted){ demoStarted=true; demoStart(); }
+          else if(!demoPlaying && !reduceMotion){ demoStart(); }
+        }
+      },{threshold:.32});
+      demoIO.observe(demo.section);
+    } else {
+      demoVisible=true; demoStart();
+    }
+  }
 })();
 </script>
 </body>

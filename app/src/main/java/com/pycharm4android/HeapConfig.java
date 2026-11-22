@@ -48,6 +48,8 @@ public final class HeapConfig {
         vm.append("-XX:MaxMetaspaceSize=512m\n");
         vm.append("-Dide.browser.jcef.enabled=false\n");
         vm.append("-Didea.initially.ask.config=false\n");
+        vm.append("-Didea.filewatcher.disabled=true\n");
+        vm.append("-Dide.no.platform.update=true\n");
         vm.append("-Dnosplash=true\n");
         vm.append("-Dsun.java2d.opengl=false\n");
         vm.append(END).append('\n');
@@ -84,6 +86,8 @@ public final class HeapConfig {
                 || line.equals("-XX:MaxMetaspaceSize=512m")
                 || line.equals("-Dide.browser.jcef.enabled=false")
                 || line.equals("-Didea.initially.ask.config=false")
+                || line.equals("-Didea.filewatcher.disabled=true")
+                || line.equals("-Dide.no.platform.update=true")
                 || line.equals("-Dnosplash=true")
                 || line.equals("-Dsun.java2d.opengl=false");
     }
