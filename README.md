@@ -104,7 +104,7 @@ APK
 
 | 版本 | 日期 | 体积 | SHA-256 | APK |
 |---|---|---|---|---|
-| v1.13.0 | 2026-11-22 | 289 KB | [`92f10fa8a165…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.13.0-arm64.apk) |
+| v1.13.0 | 2026-11-22 | 289 KB | [`d3c998c6e2a2…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.13.0-arm64.apk) |
 | v1.12.0 | 2026-11-22 | 289 KB | [`3b44d5fa47c2…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.12.0-arm64.apk) |
 | v1.11.0 | 2026-11-22 | 285 KB | [`1724137332ee…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.11.0-arm64.apk) |
 | v1.9.9 | 2026-11-21 | 280 KB | [`7cfb6f42baa6…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.9.9-arm64.apk) |

@@ -150,6 +150,7 @@ public final class TarGz {
                     }
                     case '1': { // 硬链接
                         if (size > 0) skipFully(in, size, ioBuf);
+                        if (symlinkPaths.remove(path)) out.delete();
                         File src = safeChild(dest, destBase, target, symlinkPaths);
                         if (src != null && src.exists() && !isDev) {
                             try {
