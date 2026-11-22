@@ -8,11 +8,14 @@ import java.io.File;
 public final class HeapConfig {
     private static final String START = "# >>> PYCHARM4ANDROID >>>";
     private static final String END = "# <<< PYCHARM4ANDROID <<<";
-    private static final String IDE_VMOPTIONS = "opt/pycharm/bin/pycharm64.vmoptions";
 
-    /** 写入 app 私有 runtime/vmoptions.txt，安装与热更新共用 */
-    public static void writeVmoptions(Context c) {
-        Io.writeText(new File(Dirs.runtime(c), "vmoptions.txt"), buildVmoptions(c));
+    /** 写入 app 私有 runtime/vmoptions.txt，安装与热更新共用；返回回读校验结果 */
+    public static boolean writeVmoptions(Context c) {
+        File f = new File(Dirs.runtime(c), "vmoptions.txt");
+        File base = findVmoptions(c);
+        String kept = base != null ? stripManaged(Io.readAll(base)) : "";
+        Io.writeText(f, merge(kept, buildVmoptions(c)));
+        return Io.readAll(f).contains("-Xmx" + Prefs.heapMb(c) + "m");
     }
 
     /**
@@ -20,15 +23,32 @@ public final class HeapConfig {
      * 先删除上一版托管块与 1.9.7 及更早追加的无标记参数，再写入当前托管块；
      * 重复执行不会产生重复 -Xmx。JVM 只在启动时读取，运行中改文件不影响当前进程。
      *
-     * @return false 表示 PyCharm 尚未安装
+     * @return false 表示安装目录里没有可写的默认 vmoptions（仍会使用 runtime/vmoptions.txt）
      */
     public static boolean applyToRootfs(Context c) {
-        File f = new File(Dirs.rootfs(c), IDE_VMOPTIONS);
-        if (!f.isFile()) return false;
+        File f = findVmoptions(c);
+        if (f == null) return false;
+        Io.chmod(f.getPath(), 0644);
         String kept = stripManaged(Io.readAll(f));
-        if (!kept.isEmpty() && !kept.endsWith("\n")) kept += "\n";
-        Io.writeText(f, kept + buildVmoptions(c));
-        return Io.readAll(f).contains("-Xmx" + Prefs.heapMb(c) + "m");
+        Io.writeText(f, merge(kept, buildVmoptions(c)));
+        boolean ok = Io.readAll(f).contains("-Xmx" + Prefs.heapMb(c) + "m");
+        if (ok) writeVmoptions(c);   // 同步 PYCHARM_VM_OPTIONS 文件，保留官方默认 JVM 参数
+        return ok;
+    }
+
+    private static String merge(String base, String managed) {
+        if (base.isEmpty()) return managed;
+        return base.endsWith("\n") ? base + managed : base + "\n" + managed;
+    }
+
+    /** 官方 Linux 包的默认文件；部分旧包/构建可能叫 pycharm.vmoptions */
+    private static File findVmoptions(Context c) {
+        File ide = new File(Dirs.rootfs(c), "opt/pycharm/bin");
+        for (String name : new String[]{"pycharm64.vmoptions", "pycharm.vmoptions"}) {
+            File f = new File(ide, name);
+            if (f.isFile()) return f;
+        }
+        return null;
     }
 
     /** 最近的可选档位，防止历史偏好值不在选项里 */
@@ -60,7 +80,8 @@ public final class HeapConfig {
         StringBuilder out = new StringBuilder(text.length());
         boolean inBlock = false;
         String[] lines = text.split("\n", -1);
-        for (String line : lines) {
+        for (String raw : lines) {
+            String line = raw.endsWith("\r") ? raw.substring(0, raw.length() - 1) : raw;
             if (line.equals(START)) {
                 inBlock = true;
                 continue;
@@ -81,7 +102,7 @@ public final class HeapConfig {
     }
 
     private static boolean isManagedLine(String line) {
-        return line.matches("-Xmx[0-9]+m")
+        return line.matches("-Xmx[0-9]+[mMgG]")
                 || line.equals("-XX:ReservedCodeCacheSize=256m")
                 || line.equals("-XX:MaxMetaspaceSize=512m")
                 || line.equals("-Dide.browser.jcef.enabled=false")

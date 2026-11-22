@@ -312,12 +312,12 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
     <h1>把桌面版<br><span class="accent">PyCharm</span> 装进手机</h1>
     <p class="lead">不是远程开发，也不是阉割客户端。APK 内置一套 Ubuntu arm64 用户态，proot 免 root 运行 JetBrains 官方 PyCharm，Xvfb 出图、x11vnc 推流，自研原生 RFB 客户端直接绘帧。</p>
     <div class="cta">
-      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.13.0-arm64.apk" download>下载最新版 v1.13.0 ↓</a>
+      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.0-arm64.apk" download>下载最新版 v1.14.0 ↓</a>
       <a id="ghlink2" class="btn secondary" href="https://github.com/" target="_blank" rel="noopener">查看源码</a>
     </div>
-    <div class="meta"><span>APK 289 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 d3c998c6e2a2…</span><span>镜像源 · GitProxy</span></div>
+    <div class="meta"><span>APK 289 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 55db48815070…</span><span>镜像源 · GitProxy</span></div>
     <div class="stats">
-      <div class="stat"><b>29</b><span>个历史版本</span></div>
+      <div class="stat"><b>30</b><span>个历史版本</span></div>
       <div class="stat"><b>0</b><span>root 权限要求</span></div>
       <div class="stat"><b>Raw</b><span>原生 RFB 渲染</span></div>
       <div class="stat"><b>5901</b><span>固定 VNC 端口</span></div>
@@ -405,7 +405,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 </div></section>
 
 <section id="versions"><div class="wrap">
-  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 29 个版本</h2></div><p>从 1.0.0 到 1.13.0，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
+  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 30 个版本</h2></div><p>从 1.0.0 到 1.14.0，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
   <div class="lines">
     <span class="label">下载线路</span>
     <button class="line-switch active" type="button" data-line="mirror">GitProxy 镜像</button>
@@ -417,7 +417,14 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
       <thead><tr><th>版本</th><th>构建日期</th><th>体积</th><th>SHA-256</th><th></th></tr></thead>
       <tbody>
         <tr>
-          <td><span class="ver">v1.13.0</span> <span class="tag">LATEST</span></td>
+          <td><span class="ver">v1.14.0</span> <span class="tag">LATEST</span></td>
+          <td class="muted">2026-11-22</td>
+          <td class="muted">289 KB</td>
+          <td><code data-sha="55db488150703828a8b6264a6c6f801b4fd8926c72d6a4086cdabc96ac08864f">55db48815070…</code></td>
+          <td><a class="dl" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.0-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.13.0</span></td>
           <td class="muted">2026-11-22</td>
           <td class="muted">289 KB</td>
           <td><code data-sha="d3c998c6e2a22d60b4aa028775ad550bbe1eaa413586672c0cbe68b9f11ccdcb">d3c998c6e2a2…</code></td>
@@ -651,6 +658,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <details><summary>专业版需要账号吗？</summary><p>需要。专业版首次启动会要求登录 JetBrains 账号激活，含 30 天试用；社区版免费，无需账号。</p></details>
   <details><summary>支持哪些设备？</summary><p>arm64 设备、Android 8.0+、至少 7 GB 内存；安装 IDE 需要 8 GB 以上空闲存储。x86 设备不适用。</p></details>
   <details><summary>解包或卸载时会卡住吗？</summary><p>v1.11.0 起解包会显示压缩包字节、总量、百分比和当前文件；卸载先统计文件数/体积，再按删除字节推进。大目录首次扫描需要几秒，属于正常现象，系统会持续更新进度。</p></details>
+  <details><summary>为什么修改堆内存后没生效？</summary><p>v1.14.0 起堆参数写入 <code>/opt/host/vmoptions.txt</code>，启动脚本用 <code>PYCHARM_VM_OPTIONS</code> 覆盖安装目录和用户配置；修改后必须停止并重新启动 PyCharm，JVM 才读取新 <code>-Xmx</code>。旧版只改安装目录默认文件，遇到用户配置副本会被覆盖。</p></details>
   <details><summary>v1.13.0 性能优化做了什么？</summary><p>RFB 输入/输出加缓冲，协议小字段不再逐字节走 socket；Raw 像素用 little-endian <code>IntBuffer</code> 批量读入；<code>ide.log</code> 的读取与拼接移到后台单线程；<code>TarGz</code> 普通路径不再逐条 canonical，目录创建结果缓存，无执行位文件跳过冗余 chmod；rootfs 已可执行时不再重复 chmod。</p></details>
   <details><summary>v1.12.0 性能优化做了什么？</summary><p>rootfs 校验结果缓存，避免每次启动遍历 <code>usr/bin</code>；解包复用 64 KB I/O 缓冲；主界面空闲轮询降到 2 s；显示页日志面板隐藏后停止日志读取；VNC 更新按帧合并，CopyRect 原地拷贝。</p></details>
   <details><summary>为什么端口固定 5901？</summary><p>display :1 的传统 VNC 端口。服务端和客户端都写死 5901，避免端口扫描带来的连接抖动。</p></details>

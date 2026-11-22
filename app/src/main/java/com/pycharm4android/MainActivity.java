@@ -175,8 +175,13 @@ public class MainActivity extends Activity {
 
     private void applyHeap(int mb) {
         Prefs.setHeap(this, mb);
-        HeapConfig.writeVmoptions(this);
+        final boolean runtimeOk = HeapConfig.writeVmoptions(this);
         LogBus.append("[设置] JVM 堆上限 -> " + mb + " MB");
+        if (!runtimeOk) {
+            Toast.makeText(this, "写入 JVM 参数失败，请检查应用存储空间", Toast.LENGTH_LONG).show();
+            refresh();
+            return;
+        }
         if (!Dirs.ideReadyMark(this).exists()) {
             Toast.makeText(this, "堆已设为 " + mb + " MB，将在安装 PyCharm 时生效", Toast.LENGTH_SHORT).show();
             refresh();
@@ -185,10 +190,10 @@ public class MainActivity extends Activity {
         final boolean running = IdeService.RUNNING;
         Toast.makeText(this, "正在写入 vmoptions…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
-            final boolean ok = HeapConfig.applyToRootfs(MainActivity.this);
-            final String msg = ok
+            final boolean rootfsOk = HeapConfig.applyToRootfs(MainActivity.this);
+            final String msg = rootfsOk
                     ? "堆已设为 " + mb + " MB" + (running ? "，重启 PyCharm 后生效" : "，下次启动生效")
-                    : "未找到 pycharm64.vmoptions，请先重新安装 PyCharm";
+                    : "堆已设为 " + mb + " MB；已写入运行参数，重启 PyCharm 后生效";
             LogBus.append("[设置] " + msg);
             runOnUiThread(() -> {
                 Toast.makeText(this, msg, Toast.LENGTH_LONG).show();

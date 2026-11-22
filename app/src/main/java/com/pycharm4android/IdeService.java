@@ -59,6 +59,8 @@ public class IdeService extends Service {
                 Io.chmod(dst.getPath(), 0755);
             }
             LogBus.append("[ide] 已刷新启动脚本 run-ide.sh=" + new File(rt, "run-ide.sh").length() + "B");
+            boolean vmOk = HeapConfig.writeVmoptions(this);
+            LogBus.append("[ide] JVM 运行参数 vmoptions=" + (vmOk ? "OK" : "FAIL"));
         } catch (Throwable t) {
             LogBus.append("[ide] 刷新启动脚本失败：" + t);
         }
