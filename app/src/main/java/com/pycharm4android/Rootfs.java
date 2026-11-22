@@ -30,11 +30,11 @@ public final class Rootfs {
         for (String p : new String[]{"usr/bin/env", "usr/bin/bash", "usr/bin/tar", "usr/bin/sh"}) {
             File f = new File(r, p);
             if (!f.exists()) throw new IOException("系统镜像缺少 /" + p + "（解包不完整）");
-            Io.chmod(f.getPath(), 0755);
+            ensureExec(f);
         }
         File ld = new File(r, "lib/ld-linux-aarch64.so.1");
         if (!ld.exists()) throw new IOException("系统镜像缺少 aarch64 动态链接器（/lib/ld-linux-aarch64.so.1）");
-        Io.chmod(ld.getPath(), 0755);
+        ensureExec(ld);
 
         File mark = new File(r, ".p4a-rootfs-verified");
         if (mark.isFile()) return;   // 已做过全量 chmod，避免每次 proot 启动遍历整个 usr/bin
@@ -45,6 +45,15 @@ public final class Rootfs {
         Io.writeText(mark, "verified " + t);
         LogBus.append("[rootfs] 结构校验通过：env/bash/tar/ld 均可执行（全量 chmod "
                 + (System.currentTimeMillis() - t) + " ms）");
+    }
+
+    /** 已可执行就不 chmod：proot 每次启动都会走这里，避免重复系统调用 */
+    private static void ensureExec(File f) {
+        try {
+            if (Os.access(f.getPath(), OsConstants.X_OK)) return;
+        } catch (Exception ignored) {
+        }
+        Io.chmod(f.getPath(), 0755);
     }
 
     /** 链接可用返回 true，不做创建 */

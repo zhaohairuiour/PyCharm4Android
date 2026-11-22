@@ -2,11 +2,16 @@ package com.pycharm4android;
 
 import android.util.Log;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -36,6 +41,8 @@ public final class VncClient implements Runnable {
     private int width, height;
     private int[] fb;
     private byte[] rawBuf = new byte[4];
+    private int[] rawInts = new int[1];
+    private IntBuffer rawIntBuffer;
     // 输入事件不能直接在 UI 线程写 socket（会抛 NetworkOnMainThreadException），统一排队由单线程发送
     private final ThreadPoolExecutor sender = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<Runnable>(16), new ThreadPoolExecutor.DiscardOldestPolicy());
@@ -70,8 +77,9 @@ public final class VncClient implements Runnable {
             socket.setTcpNoDelay(true);
             socket.setReceiveBufferSize(512 * 1024);
             socket.setSoTimeout(12000);   // 握手阶段防止半包卡死
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
+            // RFB 头/矩形头都是逐字节读取；不缓冲会让每个小字段都触发一次 socket read
+            in = new DataInputStream(new BufferedInputStream(socket.getInputStream(), 64 * 1024));
+            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 16 * 1024));
 
             handshake();
             listener.onConnected(width, height);
@@ -258,21 +266,28 @@ public final class VncClient implements Runnable {
 
     private void readRaw(int x, int y, int w, int h) throws IOException {
         if (w <= 0 || h <= 0) return;
-        int bytes = w * h * 4;
-        if (rawBuf.length < bytes) rawBuf = new byte[bytes];   // 复用缓冲区，避免每帧 4 MB 分配
-        byte[] buf = rawBuf;
-        in.readFully(buf, 0, bytes);
+        long pixelsLong = (long) w * h;
+        if (pixelsLong > 16_000_000L) throw new IOException("Raw 矩形过大 " + w + "x" + h);
+        int pixels = (int) pixelsLong;
+        int bytes = pixels * 4;
+        if (rawIntBuffer == null || rawInts.length < pixels || rawBuf.length < bytes) {
+            // 复用缓冲区，避免每帧 4~8 MB 分配；大矩形保留复用
+            rawInts = new int[pixels];
+            rawBuf = new byte[bytes];
+            rawIntBuffer = ByteBuffer.wrap(rawBuf).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+        }
+        in.readFully(rawBuf, 0, bytes);
+        rawIntBuffer.clear();
+        rawIntBuffer.get(rawInts, 0, pixels);
         synchronized (fbLock) {
             int[] f = fb;
             int p = 0;
+            // SetPixelFormat 固定 32bpp little-endian、redShift=16；BGRA 字节序在小端下
+            // 正好是 0xAARRGGBB，只需补不透明 alpha，避免逐通道 4 次数组访问和移位。
             for (int row = 0; row < h; row++) {
                 int base = (y + row) * width + x;
                 for (int col = 0; col < w; col++) {
-                    int b = buf[p] & 0xFF;
-                    int g = buf[p + 1] & 0xFF;
-                    int r = buf[p + 2] & 0xFF;
-                    f[base + col] = 0xFF000000 | (r << 16) | (g << 8) | b;
-                    p += 4;
+                    f[base + col] = 0xFF000000 | rawInts[p++];
                 }
             }
         }

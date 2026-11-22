@@ -23,6 +23,8 @@ import android.widget.TextView;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 远程桌面显示页：VncView + 自绘软键盘 + 启动日志面板。
@@ -52,6 +54,8 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
     private String shownLog = "";
     private String shownStage = "";
     private Runnable logPump;
+    private ExecutorService logIo;
+    private volatile boolean logReadPending = false;
     private long lastIdeLength = -1, lastIdeModified = -1, lastIdeLogVersion = -1;
     private String cachedIde = "";
     private String connectHost = "127.0.0.1";
@@ -92,6 +96,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
 
         reportLastCrash();
         if (!IdeService.RUNNING) IdeService.start(this);
+        logIo = Executors.newSingleThreadExecutor(r -> new Thread(r, "ide-log-tail"));
         startLogPump();
     }
 
@@ -387,40 +392,65 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         logPump = null;
     }
 
+    /** UI 线程只投递任务；读 200 KB 日志、拼关键事件全部在单线程后台完成，避免启动期卡顿 */
     private void pumpLogs() {
-        File ideLog = new File(Dirs.rootfs(this), "root/ide.log");
-        long len = ideLog.exists() ? ideLog.length() : 0;
-        long mod = ideLog.exists() ? ideLog.lastModified() : 0;
-        long busVer = LogBus.version();
-        boolean ideChanged = len != lastIdeLength || mod != lastIdeModified;
-        if (ideChanged) {
-            cachedIde = composeLog(tail(ideLog, 200_000));
-            lastIdeLength = len;
-            lastIdeModified = mod;
-        }
-        if (!ideChanged && busVer == lastIdeLogVersion) {
-            String st = stage(cachedIde);
-            if (!st.equals(shownStage)) { shownStage = st; logStage.setText(st); }
-            return;
-        }
-        lastIdeLogVersion = busVer;
-        String body = cachedIde + "\n\n── 服务日志 ──\n" + LogBus.text(120);
-        if (body.length() > 6000) body = body.substring(body.length() - 6000);
-        if (!body.equals(shownLog)) {
-            if (!shownLog.isEmpty() && body.startsWith(shownLog)) {
-                logText.append(body.substring(shownLog.length()));
-            } else {
-                logText.setText(body);
+        final ExecutorService io = logIo;
+        if (finished || io == null || logReadPending) return;
+        logReadPending = true;
+        final File ideLog = new File(Dirs.rootfs(this), "root/ide.log");
+        io.execute(() -> {
+            String body = null;
+            String stageText = null;
+            try {
+                long len = ideLog.exists() ? ideLog.length() : 0;
+                long mod = ideLog.exists() ? ideLog.lastModified() : 0;
+                long busVer = LogBus.version();
+                boolean ideChanged = len != lastIdeLength || mod != lastIdeModified;
+                if (ideChanged) {
+                    cachedIde = composeLog(tail(ideLog, 200_000));
+                    lastIdeLength = len;
+                    lastIdeModified = mod;
+                }
+                if (!ideChanged && busVer == lastIdeLogVersion) {
+                    stageText = stage(cachedIde);
+                } else {
+                    lastIdeLogVersion = busVer;
+                    body = cachedIde + "\n\n── 服务日志 ──\n" + LogBus.text(120);
+                    if (body.length() > 6000) body = body.substring(body.length() - 6000);
+                    stageText = stage(cachedIde);
+                }
+            } catch (Throwable t) {
+                body = "日志读取失败：" + t;
+                stageText = "日志读取失败";
             }
-            shownLog = body;
-            logScroll.post(() -> {
-                View child = logScroll.getChildAt(0);
-                int max = child == null ? 0 : Math.max(0, child.getHeight() - logScroll.getHeight());
-                logScroll.scrollTo(0, max);
+            final String fBody = body;
+            final String fStage = stageText;
+            ui.post(() -> {
+                logReadPending = false;
+                if (finished) return;
+                if (fBody != null) applyLog(fBody);
+                if (fStage != null && !fStage.equals(shownStage)) {
+                    shownStage = fStage;
+                    logStage.setText(fStage);
+                }
             });
+        });
+    }
+
+    /** 主线程只做 TextView 增量追加，整体替换只在日志回绕/换段时发生 */
+    private void applyLog(String body) {
+        if (body.equals(shownLog)) return;
+        if (!shownLog.isEmpty() && body.startsWith(shownLog)) {
+            logText.append(body.substring(shownLog.length()));
+        } else {
+            logText.setText(body);
         }
-        String st = stage(cachedIde);
-        if (!st.equals(shownStage)) { shownStage = st; logStage.setText(st); }
+        shownLog = body;
+        logScroll.post(() -> {
+            View child = logScroll.getChildAt(0);
+            int max = child == null ? 0 : Math.max(0, child.getHeight() - logScroll.getHeight());
+            logScroll.scrollTo(0, max);
+        });
     }
 
     /** 关键事件优先：run-ide / VNC / Xvfb / 诊断行，再附末尾 25 行原始输出 */
@@ -550,6 +580,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         finished = true;
         resumed = false;
         stopLogPump();
+        if (logIo != null) logIo.shutdownNow();
         if (client != null) client.close();
         ui.removeCallbacksAndMessages(null);
         super.onDestroy();

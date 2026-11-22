@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -48,6 +49,9 @@ public final class TarGz {
     public static void extract(File archive, File dest, Progress progress) throws IOException {
         dest.mkdirs();
         String destBase = dest.getCanonicalPath();
+        HashSet<String> madeDirs = new HashSet<>();   // 同一目录只 mkdirs 一次
+        HashSet<String> symlinkPaths = new HashSet<>(); // 仅对符号链接前缀做 canonical 校验
+        ensureDir(dest, madeDirs);
         byte[] ioBuf = new byte[64 * 1024];   // 整个解包复用，避免每个文件分配 64 KB
         int files = 0;
         String paxPath = null, paxLink = null, longName = null, longLink = null;
@@ -99,6 +103,7 @@ public final class TarGz {
                 longLink = null;
 
                 if (path.startsWith("./")) path = path.substring(2);
+                while (path.length() > 1 && path.endsWith("/")) path = path.substring(0, path.length() - 1);
                 if (path.isEmpty() || path.equals(".")) {
                     if (type != '5') {
                         skipFully(in, size, ioBuf);
@@ -111,18 +116,18 @@ public final class TarGz {
                 boolean isDev = path.startsWith("dev/") || path.equals("dev");
                 reporter.path(path);
 
-                File out = safeChild(dest, destBase, path);
+                File out = safeChild(dest, destBase, path, symlinkPaths);
                 if (out == null) {
                     skipFully(in, size, ioBuf);
                     skipPad(in, size, ioBuf);
                     continue;
                 }
-                File parent = out.getParentFile();
-                if (parent != null) parent.mkdirs();
+                ensureDir(out.getParentFile(), madeDirs);
 
                 switch (type) {
                     case '5': { // 目录
-                        out.mkdirs();
+                        if (symlinkPaths.remove(path)) out.delete();
+                        ensureDir(out, madeDirs);
                         Io.chmod(out.getPath(), mode | 0700);
                         if (size > 0) {
                             skipFully(in, size, ioBuf);
@@ -135,6 +140,7 @@ public final class TarGz {
                         if (!isDev) {
                             try {
                                 Os.symlink(target, out.getPath());
+                                symlinkPaths.add(path);
                             } catch (Exception e) {
                                 LogBus.append("[解包] 符号链接失败 " + path + " : " + e.getMessage());
                             }
@@ -144,7 +150,7 @@ public final class TarGz {
                     }
                     case '1': { // 硬链接
                         if (size > 0) skipFully(in, size, ioBuf);
-                        File src = safeChild(dest, destBase, target);
+                        File src = safeChild(dest, destBase, target, symlinkPaths);
                         if (src != null && src.exists() && !isDev) {
                             try {
                                 Os.link(src.getPath(), out.getPath());
@@ -164,16 +170,20 @@ public final class TarGz {
                     }
                     default: { // 普通文件（'0' / '7' / ' '）
                         if (isDev) {
-                            if (path.equals("dev")) out.mkdirs();
+                            if (path.equals("dev")) ensureDir(out, madeDirs);
                             skipFully(in, size, ioBuf);
                             skipPad(in, size, ioBuf);
                             break;
                         }
+                        if (symlinkPaths.remove(path)) out.delete();
                         try (FileOutputStream fos = new FileOutputStream(out)) {
                             copyData(in, fos, size, reporter, ioBuf);
                         }
                         skipPad(in, size, ioBuf);
-                        Io.chmod(out.getPath(), mode | 0600);
+                        // 无执行位的普通文件由 FileOutputStream 以 0600 创建；同 uid 已可读写，
+                        // 跳过 chmod 可省掉每个文件一次系统调用。执行位仍按 tar 权限落地。
+                        int perm = mode & 07777;
+                        if ((perm & 0111) != 0) Io.chmod(out.getPath(), perm | 0600);
                         files++;
                         if (files % 2000 == 0) LogBus.append("[解包] 已写入 " + files + " 个文件…");
                         break;
@@ -260,7 +270,19 @@ public final class TarGz {
         return map;
     }
 
-    private static File safeChild(File dest, String base, String path) {
+    private static void ensureDir(File dir, HashSet<String> made) {
+        if (dir == null) return;
+        String key = dir.getPath();
+        if (made.contains(key)) return;
+        if (dir.isDirectory() || dir.mkdirs()) made.add(key);
+    }
+
+    private static File safeChild(File dest, String base, String path, HashSet<String> symlinks) {
+        // 绝大多数条目不含 ..、绝对路径或符号链接前缀，直接用 File 拼接；
+        // 只有可疑路径才走 canonical，避免每个文件一次 stat 遍历。
+        if (!path.startsWith("/") && !hasParentRef(path) && !hasSymlinkAncestor(path, symlinks)) {
+            return new File(dest, path);
+        }
         try {
             File f = new File(dest, path);
             String p = f.getCanonicalPath();
@@ -269,6 +291,22 @@ public final class TarGz {
         } catch (IOException e) {
             return null;
         }
+    }
+
+    private static boolean hasParentRef(String path) {
+        if (path.equals("..")) return true;
+        if (path.startsWith("../") || path.endsWith("/..") || path.contains("/../")) return true;
+        return false;
+    }
+
+    private static boolean hasSymlinkAncestor(String path, HashSet<String> symlinks) {
+        if (symlinks.isEmpty()) return false;
+        int slash = path.indexOf('/');
+        while (slash > 0) {
+            if (symlinks.contains(path.substring(0, slash))) return true;
+            slash = path.indexOf('/', slash + 1);
+        }
+        return false;
     }
 
     private static int readFully(InputStream in, byte[] buf) throws IOException {
