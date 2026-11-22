@@ -20,6 +20,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -46,6 +47,12 @@ public class VncView extends View {
 
     private Bitmap cursorBitmap;
     private int[] cursorRef;
+
+    // VNC 线程按帧合并更新，避免每个 RFB 消息都向主线程投递一个 Runnable
+    private final Object pendingLock = new Object();
+    private final ArrayList<int[]> pendingRects = new ArrayList<>();
+    private boolean updateScheduled = false;
+    private final Runnable flushUpdates = this::flushUpdates;
     private boolean hasPointer = false;
     private boolean rightClickNext = false;
     private boolean downPending = false;
@@ -119,9 +126,55 @@ public class VncView extends View {
         if (w <= 0 || h <= 0) return;
         fbW = w;
         fbH = h;
-        // 不 recycle 旧 bitmap：重连时绘制线程可能仍在读
-        bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        // 不清 pending：握手后首个 RFB 更新可能已先于本回调排队，必须保留首帧
+        // 同尺寸重连复用 Bitmap，避免每次重连分配约 4 MB；旧帧直接擦黑等首帧覆盖
+        if (bitmap != null && bitmap.getWidth() == w && bitmap.getHeight() == h) {
+            bitmap.eraseColor(Color.BLACK);
+        } else {
+            // 不 recycle 旧 bitmap：重连时绘制线程可能仍在读
+            bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        }
         postInvalidate();
+    }
+
+    /** 连接前清空上一连接的残留更新（旧 client 已 close） */
+    public void clearPending() {
+        synchronized (pendingLock) {
+            pendingRects.clear();
+            updateScheduled = false;
+        }
+    }
+
+    /** VNC 线程调用：先入队，合并到下一次 UI 帧再 copy */
+    public void queueUpdate(List<int[]> rects) {
+        if (rects == null || rects.isEmpty()) return;
+        synchronized (pendingLock) {
+            for (int[] r : rects) {
+                if (r != null && r.length >= 4) pendingRects.add(r);
+            }
+            if (updateScheduled) return;
+            updateScheduled = true;
+        }
+        if (!post(flushUpdates)) {
+            synchronized (pendingLock) {
+                pendingRects.clear();
+                updateScheduled = false;
+            }
+        }
+    }
+
+    private void flushUpdates() {
+        List<int[]> batch;
+        synchronized (pendingLock) {
+            if (pendingRects.isEmpty()) {
+                updateScheduled = false;
+                return;
+            }
+            batch = new ArrayList<>(pendingRects);
+            pendingRects.clear();
+            updateScheduled = false;
+        }
+        applyUpdate(batch);
     }
 
     public void applyUpdate(List<int[]> rects) {

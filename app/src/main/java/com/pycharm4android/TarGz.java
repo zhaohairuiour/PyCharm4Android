@@ -47,6 +47,8 @@ public final class TarGz {
 
     public static void extract(File archive, File dest, Progress progress) throws IOException {
         dest.mkdirs();
+        String destBase = dest.getCanonicalPath();
+        byte[] ioBuf = new byte[64 * 1024];   // 整个解包复用，避免每个文件分配 64 KB
         int files = 0;
         String paxPath = null, paxLink = null, longName = null, longLink = null;
         Reporter reporter = null;
@@ -69,23 +71,23 @@ public final class TarGz {
                 String link = field(hdr, 157, 100);
 
                 if (type == 'x' || type == 'g') {   // pax 扩展头
-                    String body = readData(in, size);
+                    String body = readData(in, size, ioBuf);
                     if (type == 'x') {
                         Map<String, String> kv = parsePax(body);
                         if (kv.containsKey("path")) paxPath = kv.get("path");
                         if (kv.containsKey("linkpath")) paxLink = kv.get("linkpath");
                     }
-                    skipPad(in, size);
+                    skipPad(in, size, ioBuf);
                     continue;
                 }
                 if (type == 'L') {                  // GNU 长文件名
-                    longName = readData(in, size);
-                    skipPad(in, size);
+                    longName = readData(in, size, ioBuf);
+                    skipPad(in, size, ioBuf);
                     continue;
                 }
                 if (type == 'K') {                  // GNU 长链接名
-                    longLink = readData(in, size);
-                    skipPad(in, size);
+                    longLink = readData(in, size, ioBuf);
+                    skipPad(in, size, ioBuf);
                     continue;
                 }
 
@@ -99,8 +101,8 @@ public final class TarGz {
                 if (path.startsWith("./")) path = path.substring(2);
                 if (path.isEmpty() || path.equals(".")) {
                     if (type != '5') {
-                        skipFully(in, size);
-                        skipPad(in, size);
+                        skipFully(in, size, ioBuf);
+                        skipPad(in, size, ioBuf);
                     }
                     continue;
                 }
@@ -109,10 +111,10 @@ public final class TarGz {
                 boolean isDev = path.startsWith("dev/") || path.equals("dev");
                 reporter.path(path);
 
-                File out = safeChild(dest, path);
+                File out = safeChild(dest, destBase, path);
                 if (out == null) {
-                    skipFully(in, size);
-                    skipPad(in, size);
+                    skipFully(in, size, ioBuf);
+                    skipPad(in, size, ioBuf);
                     continue;
                 }
                 File parent = out.getParentFile();
@@ -123,13 +125,13 @@ public final class TarGz {
                         out.mkdirs();
                         Io.chmod(out.getPath(), mode | 0700);
                         if (size > 0) {
-                            skipFully(in, size);
-                            skipPad(in, size);
+                            skipFully(in, size, ioBuf);
+                            skipPad(in, size, ioBuf);
                         }
                         break;
                     }
                     case '2': { // 符号链接
-                        if (size > 0) skipFully(in, size);
+                        if (size > 0) skipFully(in, size, ioBuf);
                         if (!isDev) {
                             try {
                                 Os.symlink(target, out.getPath());
@@ -137,12 +139,12 @@ public final class TarGz {
                                 LogBus.append("[解包] 符号链接失败 " + path + " : " + e.getMessage());
                             }
                         }
-                        skipPad(in, size);
+                        skipPad(in, size, ioBuf);
                         break;
                     }
                     case '1': { // 硬链接
-                        if (size > 0) skipFully(in, size);
-                        File src = safeChild(dest, target);
+                        if (size > 0) skipFully(in, size, ioBuf);
+                        File src = safeChild(dest, destBase, target);
                         if (src != null && src.exists() && !isDev) {
                             try {
                                 Os.link(src.getPath(), out.getPath());
@@ -150,27 +152,27 @@ public final class TarGz {
                                 try { Io.copyFile(src, out); } catch (IOException ignored) {}
                             }
                         }
-                        skipPad(in, size);
+                        skipPad(in, size, ioBuf);
                         break;
                     }
                     case '3':
                     case '4':
                     case '6': { // 块设备 / 字符设备 / FIFO
-                        skipFully(in, size);
-                        skipPad(in, size);
+                        skipFully(in, size, ioBuf);
+                        skipPad(in, size, ioBuf);
                         break;
                     }
                     default: { // 普通文件（'0' / '7' / ' '）
                         if (isDev) {
                             if (path.equals("dev")) out.mkdirs();
-                            skipFully(in, size);
-                            skipPad(in, size);
+                            skipFully(in, size, ioBuf);
+                            skipPad(in, size, ioBuf);
                             break;
                         }
                         try (FileOutputStream fos = new FileOutputStream(out)) {
-                            copyData(in, fos, size, reporter);
+                            copyData(in, fos, size, reporter, ioBuf);
                         }
-                        skipPad(in, size);
+                        skipPad(in, size, ioBuf);
                         Io.chmod(out.getPath(), mode | 0600);
                         files++;
                         if (files % 2000 == 0) LogBus.append("[解包] 已写入 " + files + " 个文件…");
@@ -258,10 +260,9 @@ public final class TarGz {
         return map;
     }
 
-    private static File safeChild(File dest, String path) {
+    private static File safeChild(File dest, String base, String path) {
         try {
             File f = new File(dest, path);
-            String base = dest.getCanonicalPath();
             String p = f.getCanonicalPath();
             if (!p.equals(base) && !p.startsWith(base + File.separator)) return null;
             return f;
@@ -308,13 +309,12 @@ public final class TarGz {
     }
 
     /** 跳过一个条目的 512 字节对齐填充 */
-    private static void skipPad(InputStream in, long size) throws IOException {
+    private static void skipPad(InputStream in, long size, byte[] buf) throws IOException {
         long pad = (BLOCK - (size % BLOCK)) % BLOCK;
-        if (pad > 0) skipFully(in, pad);
+        if (pad > 0) skipFully(in, pad, buf);
     }
 
-    private static void skipFully(InputStream in, long n) throws IOException {
-        byte[] buf = new byte[8192];
+    private static void skipFully(InputStream in, long n, byte[] buf) throws IOException {
         long remaining = n;
         while (remaining > 0) {
             int r = in.read(buf, 0, (int) Math.min(buf.length, remaining));
@@ -323,10 +323,9 @@ public final class TarGz {
         }
     }
 
-    private static String readData(InputStream in, long size) throws IOException {
+    private static String readData(InputStream in, long size, byte[] buf) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream((int) Math.min(size, 1 << 20));
         long remaining = size;
-        byte[] buf = new byte[4096];
         while (remaining > 0) {
             int n = in.read(buf, 0, (int) Math.min(buf.length, remaining));
             if (n < 0) throw new IOException("tar 元数据截断");
@@ -336,9 +335,9 @@ public final class TarGz {
         return new String(bos.toByteArray(), StandardCharsets.UTF_8).trim();
     }
 
-    private static void copyData(InputStream in, FileOutputStream out, long size, Reporter reporter) throws IOException {
+    private static void copyData(InputStream in, FileOutputStream out, long size, Reporter reporter,
+                                 byte[] buf) throws IOException {
         long remaining = size;
-        byte[] buf = new byte[64 * 1024];
         while (remaining > 0) {
             int n = in.read(buf, 0, (int) Math.min(buf.length, remaining));
             if (n < 0) throw new IOException("tar 数据截断");

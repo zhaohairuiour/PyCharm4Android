@@ -281,12 +281,18 @@ public final class VncClient implements Runnable {
     private void copyRect(int sx, int sy, int dx, int dy, int w, int h) {
         synchronized (fbLock) {
             int[] f = fb;
-            int[] tmp = new int[w * h];
-            for (int row = 0; row < h; row++) {
-                System.arraycopy(f, (sy + row) * width + sx, tmp, row * w, w);
-            }
-            for (int row = 0; row < h; row++) {
-                System.arraycopy(tmp, row * w, f, (dy + row) * width + dx, w);
+            // 原地拷贝；纵向从下往上，避免覆盖尚未读取的源行。
+            // 每行 System.arraycopy 自身可正确处理横向重叠，不再分配 w*h 临时数组。
+            if (dy <= sy) {
+                for (int row = 0; row < h; row++) {
+                    System.arraycopy(f, (sy + row) * width + sx,
+                            f, (dy + row) * width + dx, w);
+                }
+            } else {
+                for (int row = h - 1; row >= 0; row--) {
+                    System.arraycopy(f, (sy + row) * width + sx,
+                            f, (dy + row) * width + dx, w);
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ import java.io.IOException;
  */
 public final class Rootfs {
 
-    /** 校验关键路径与可执行位；可在每次启动容器前重复调用（幂等） */
+    /** 校验关键路径与可执行位；首次校验后写标记，后续启动只做关键项检查 */
     public static void verify(Context c) throws IOException {
         File r = Dirs.rootfs(c);
         if (!new File(r, "usr/bin").isDirectory()) {
@@ -26,6 +26,7 @@ public final class Rootfs {
         ensureLink(r, "sbin", "usr/sbin");
         if (new File(r, "usr/lib64").isDirectory()) ensureLink(r, "lib64", "usr/lib64");
 
+        // 关键文件每次都确认存在并补可执行位，成本只有 5 次 chmod
         for (String p : new String[]{"usr/bin/env", "usr/bin/bash", "usr/bin/tar", "usr/bin/sh"}) {
             File f = new File(r, p);
             if (!f.exists()) throw new IOException("系统镜像缺少 /" + p + "（解包不完整）");
@@ -35,10 +36,15 @@ public final class Rootfs {
         if (!ld.exists()) throw new IOException("系统镜像缺少 aarch64 动态链接器（/lib/ld-linux-aarch64.so.1）");
         Io.chmod(ld.getPath(), 0755);
 
-        // 兜底补可执行位：部分机型解包后模式位可能没落地，execve 会失败
+        File mark = new File(r, ".p4a-rootfs-verified");
+        if (mark.isFile()) return;   // 已做过全量 chmod，避免每次 proot 启动遍历整个 usr/bin
+        // 首次安装/重新解包后做一次全量兜底：部分机型解包后模式位可能没落地
+        long t = System.currentTimeMillis();
         chmodTree(new File(r, "usr/bin"), 0755);
         chmodTree(new File(r, "usr/sbin"), 0755);
-        LogBus.append("[rootfs] 结构校验通过：env/bash/tar/ld 均可执行");
+        Io.writeText(mark, "verified " + t);
+        LogBus.append("[rootfs] 结构校验通过：env/bash/tar/ld 均可执行（全量 chmod "
+                + (System.currentTimeMillis() - t) + " ms）");
     }
 
     /** 链接可用返回 true，不做创建 */
@@ -48,11 +54,7 @@ public final class Rootfs {
 
     private static void ensureLink(File rootfs, String name, String target) {
         File path = new File(rootfs, name);
-        if (path.exists()) {
-            if (isSymlink(path)) LogBus.append("[rootfs] " + name + " -> " + readLink(path) + "（正常）");
-            else LogBus.append("[rootfs] " + name + " 为实体目录（正常）");
-            return;
-        }
+        if (path.exists()) return;   // 正常路径不刷日志，避免 Proot.builder 每次调用都产生 5 条字符串
         if (isSymlink(path)) { // 悬挂链接
             //noinspection ResultOfMethodCallIgnored
             path.delete();
@@ -103,9 +105,6 @@ public final class Rootfs {
         }
     }
 
-    private static String readLink(File f) {
-        try { return Os.readlink(f.getPath()); } catch (Exception e) { return "?"; }
-    }
 
     private Rootfs() {}
 }

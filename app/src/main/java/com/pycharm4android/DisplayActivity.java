@@ -50,6 +50,10 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
     private boolean logsPinned = false;
     private final long startedAt = System.currentTimeMillis();
     private String shownLog = "";
+    private String shownStage = "";
+    private Runnable logPump;
+    private long lastIdeLength = -1, lastIdeModified = -1, lastIdeLogVersion = -1;
+    private String cachedIde = "";
     private String connectHost = "127.0.0.1";
     private int connectPort = Const.VNC_PORT;
     private int retryCount = 0;
@@ -350,24 +354,57 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         boolean show = logPanel.getVisibility() != View.VISIBLE;
         logsPinned = show;
         logPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            startLogPump();
+            pumpLogs();
+        } else if (connected) {
+            stopLogPump();
+        }
     }
 
     // ---------------- 启动日志 ----------------
 
+    /** 启动/日志面板可见时轮询；连接成功且面板隐藏后完全停止，避免后台读 200KB 日志 */
     private void startLogPump() {
-        ui.postDelayed(new Runnable() {
+        if (finished || logPump != null) return;
+        logPump = new Runnable() {
             @Override public void run() {
-                if (finished) return;
+                if (finished) { logPump = null; return; }
                 pumpLogs();
-                ui.postDelayed(this, 800);
+                boolean keep = !connected || logsPinned || logPanel.getVisibility() == View.VISIBLE;
+                if (keep) {
+                    ui.postDelayed(this, connected ? 1500 : 700);
+                } else {
+                    logPump = null;
+                }
             }
-        }, 200);
+        };
+        ui.postDelayed(logPump, 200);
+    }
+
+    private void stopLogPump() {
+        if (logPump != null) ui.removeCallbacks(logPump);
+        logPump = null;
     }
 
     private void pumpLogs() {
         File ideLog = new File(Dirs.rootfs(this), "root/ide.log");
-        String ide = composeLog(tail(ideLog, 200_000));
-        String body = ide + "\n\n── 服务日志 ──\n" + LogBus.text(120);
+        long len = ideLog.exists() ? ideLog.length() : 0;
+        long mod = ideLog.exists() ? ideLog.lastModified() : 0;
+        long busVer = LogBus.version();
+        boolean ideChanged = len != lastIdeLength || mod != lastIdeModified;
+        if (ideChanged) {
+            cachedIde = composeLog(tail(ideLog, 200_000));
+            lastIdeLength = len;
+            lastIdeModified = mod;
+        }
+        if (!ideChanged && busVer == lastIdeLogVersion) {
+            String st = stage(cachedIde);
+            if (!st.equals(shownStage)) { shownStage = st; logStage.setText(st); }
+            return;
+        }
+        lastIdeLogVersion = busVer;
+        String body = cachedIde + "\n\n── 服务日志 ──\n" + LogBus.text(120);
         if (body.length() > 6000) body = body.substring(body.length() - 6000);
         if (!body.equals(shownLog)) {
             if (!shownLog.isEmpty() && body.startsWith(shownLog)) {
@@ -382,7 +419,8 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
                 logScroll.scrollTo(0, max);
             });
         }
-        logStage.setText(stage(ide));
+        String st = stage(cachedIde);
+        if (!st.equals(shownStage)) { shownStage = st; logStage.setText(st); }
     }
 
     /** 关键事件优先：run-ide / VNC / Xvfb / 诊断行，再附末尾 25 行原始输出 */
@@ -456,6 +494,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         connectPort = Const.VNC_PORT;
         status.setText("连接 " + connectHost + ":" + connectPort + " …");
         if (client != null) client.close();
+        vncView.clearPending();
         client = new VncClient(connectHost, connectPort, this);
         vncView.setClient(client);
         imeInput.setClient(client);
@@ -467,14 +506,17 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         connected = true;
         ui.post(() -> {
             status.setVisibility(View.GONE);
-            if (!logsPinned) logPanel.setVisibility(View.GONE);
+            if (!logsPinned) {
+                logPanel.setVisibility(View.GONE);
+                stopLogPump();
+            }
             vncView.onConnected(w, h);
         });
     }
 
     @Override
     public void onUpdate(List<int[]> rects) {
-        ui.post(() -> vncView.applyUpdate(rects));
+        vncView.queueUpdate(rects);   // VNC 线程直接入队，按帧合并，避免刷爆主线程 Handler
     }
 
     @Override
@@ -498,6 +540,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
                 status.setText("容器已停止（IDE 已退出），点「重连」会重新拉起容器");
                 return;                      // 容器不在，不再空转重连
             }
+            startLogPump();
             ui.postDelayed(reconnect, 1500);
         });
     }
@@ -506,6 +549,7 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
     protected void onDestroy() {
         finished = true;
         resumed = false;
+        stopLogPump();
         if (client != null) client.close();
         ui.removeCallbacksAndMessages(null);
         super.onDestroy();

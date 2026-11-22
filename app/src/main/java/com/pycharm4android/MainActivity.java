@@ -25,6 +25,11 @@ public class MainActivity extends Activity {
     private long lastLogVersion = -1;
     private boolean stickBottom = true;   // 用户滚到底部才自动跟随
     private boolean updatingLog = false;
+    private long lastDetailAt = 0;
+    private String lastStatusText, lastDetailText;
+    private int lastPercent = -1;
+    private boolean lastIndeterminate, lastReady, lastRunning, lastIdeRunning;
+    private boolean firstRefresh = true;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -429,6 +434,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        refresh(true);
         ui.post(poll);
     }
 
@@ -441,16 +447,24 @@ public class MainActivity extends Activity {
     private final Runnable poll = new Runnable() {
         @Override
         public void run() {
-            refresh();
-            // 下载阶段 400ms 刷新，能看到 MB 与速度在跳
-            ui.postDelayed(this, SetupState.running ? 400 : 800);
+            refresh(false);
+            // 安装/下载 400ms；空闲降到 2s，避免主界面常驻高频重绘和 StatFs 查询
+            ui.postDelayed(this, SetupState.running ? 400 : 2000);
         }
     };
 
-    private void refresh() {
+    private void refresh() { refresh(true); }
+
+    private void refresh(boolean forceDetail) {
         boolean ready = isReady();
-        bar.setProgress(SetupState.percent);
-        bar.setIndeterminate(SetupState.indeterminate || (SetupState.running && SetupState.percent <= 0));
+        int percent = SetupState.percent;
+        boolean indeterminate = SetupState.indeterminate || (SetupState.running && percent <= 0);
+        if (percent != lastPercent || indeterminate != lastIndeterminate) {
+            bar.setProgress(percent);
+            bar.setIndeterminate(indeterminate);
+            lastPercent = percent;
+            lastIndeterminate = indeterminate;
+        }
 
         String s;
         if (SetupState.running) {
@@ -465,32 +479,45 @@ public class MainActivity extends Activity {
         } else {
             s = "尚未安装：首次使用请点击「开始安装」";
         }
-        status.setText(s);
-        status.setTextColor(SetupState.error ? 0xFFFF5370 : (ready ? 0xFF41E3A0 : 0xFF7DE9FF));
+        if (!s.equals(lastStatusText)) { status.setText(s); lastStatusText = s; }
+        int color = SetupState.error ? 0xFFFF5370 : (ready ? 0xFF41E3A0 : 0xFF7DE9FF);
+        if (status.getCurrentTextColor() != color) status.setTextColor(color);
 
-        ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
-        if (am != null) am.getMemoryInfo(mi);
-        String installedIde = Versions.installed(this);
-        detail.setText("设备内存 " + (mi.totalMem / 1073741824L) + " GB · 可用 " + (mi.availMem / 1048576L)
-                + " MB · 架构 " + android.os.Build.SUPPORTED_ABIS[0]
-                + "\n分辨率 " + Prefs.screen(this) + " · 堆 " + Prefs.heapMb(this) + " MB"
-                + "\n镜像源：" + Mirrors.NAMES[Math.min(Prefs.mirrorIndex(this), Mirrors.NAMES.length - 1)]
-                + "\nPyCharm：" + Versions.pretty(installedIde)
-                + " · 目标：" + (Prefs.ideVersion(this).isEmpty() ? "最新社区版" : Versions.pretty(Prefs.ideVersion(this)))
-                + "\n存储可用 " + Downloader.fmt(new android.os.StatFs(getFilesDir().getAbsolutePath()).getAvailableBytes()));
+        long now = System.currentTimeMillis();
+        if (forceDetail || now - lastDetailAt >= 5000) {
+            lastDetailAt = now;
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+            if (am != null) am.getMemoryInfo(mi);
+            String installedIde = Versions.installed(this);
+            String d = "设备内存 " + (mi.totalMem / 1073741824L) + " GB · 可用 " + (mi.availMem / 1048576L)
+                    + " MB · 架构 " + android.os.Build.SUPPORTED_ABIS[0]
+                    + "\n分辨率 " + Prefs.screen(this) + " · 堆 " + Prefs.heapMb(this) + " MB"
+                    + "\n镜像源：" + Mirrors.NAMES[Math.min(Prefs.mirrorIndex(this), Mirrors.NAMES.length - 1)]
+                    + "\nPyCharm：" + Versions.pretty(installedIde)
+                    + " · 目标：" + (Prefs.ideVersion(this).isEmpty() ? "最新社区版" : Versions.pretty(Prefs.ideVersion(this)))
+                    + "\n存储可用 " + Downloader.fmt(new android.os.StatFs(getFilesDir().getAbsolutePath()).getAvailableBytes());
+            if (!d.equals(lastDetailText)) { detail.setText(d); lastDetailText = d; }
+        }
 
-        install.setEnabled(!SetupState.running);
-        launch.setEnabled(ready && !SetupState.running);
-        display.setEnabled(ready && !SetupState.running);
-        stop.setEnabled(IdeService.RUNNING);
-        version.setEnabled(!SetupState.running);
-        heap.setEnabled(!SetupState.running);
-        install.setAlpha(SetupState.running ? 0.45f : 1f);
-        launch.setAlpha(ready && !SetupState.running ? 1f : 0.45f);
-        display.setAlpha(ready && !SetupState.running ? 1f : 0.45f);
-        stop.setAlpha(IdeService.RUNNING ? 1f : 0.45f);
-        heap.setAlpha(SetupState.running ? 0.45f : 1f);
+        boolean running = SetupState.running, ideRunning = IdeService.RUNNING;
+        if (firstRefresh || ready != lastReady || running != lastRunning || ideRunning != lastIdeRunning) {
+            install.setEnabled(!running);
+            launch.setEnabled(ready && !running);
+            display.setEnabled(ready && !running);
+            stop.setEnabled(ideRunning);
+            version.setEnabled(!running);
+            heap.setEnabled(!running);
+            install.setAlpha(running ? 0.45f : 1f);
+            launch.setAlpha(ready && !running ? 1f : 0.45f);
+            display.setAlpha(ready && !running ? 1f : 0.45f);
+            stop.setAlpha(ideRunning ? 1f : 0.45f);
+            heap.setAlpha(running ? 0.45f : 1f);
+            lastReady = ready;
+            lastRunning = running;
+            lastIdeRunning = ideRunning;
+            firstRefresh = false;
+        }
 
         if (LogBus.version() != lastLogVersion) {
             lastLogVersion = LogBus.version();
