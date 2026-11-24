@@ -4,7 +4,7 @@ package com.pycharm4android;
 public final class Const {
     public static final String PKG = "com.pycharm4android";
     /** 与 build.gradle.kts 的 versionName 保持一致，主界面显示，便于确认装的是哪版 */
-    public static final String VERSION_NAME = "1.14.0";
+    public static final String VERSION_NAME = "1.14.1";
 
     /** Ubuntu 24.04 base rootfs（arm64，tar.gz，约 30 MB，官方地址） */
     public static final String ROOTFS_URL =

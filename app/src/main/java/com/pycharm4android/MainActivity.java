@@ -3,6 +3,8 @@ package com.pycharm4android;
 import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -40,6 +42,16 @@ public class MainActivity extends Activity {
         detail = findViewById(R.id.detail);
         log = findViewById(R.id.log);
         logScroll = findViewById(R.id.logScroll);
+        // 文本选择会抢走纵向拖拽手势，日志区优先保证可滚动；长按改为复制全文
+        log.setTextIsSelectable(false);
+        log.setOnLongClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(ClipData.newPlainText("PyCharm 日志", log.getText()));
+                Toast.makeText(this, "日志已复制", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        });
         // 日志区自己滚动，别被外层 ScrollView 抢走手势
         log.setOnTouchListener((v, e) -> {
             logScroll.requestDisallowInterceptTouchEvent(true);
@@ -529,6 +541,7 @@ public class MainActivity extends Activity {
             final boolean follow = stickBottom;
             String full = LogBus.text(300);
             String shown = log.getText().toString();
+            int oldY = logScroll.getScrollY();
             updatingLog = true;
             if (!shown.isEmpty() && full.startsWith(shown)) {
                 // 只追加新增行：不重排已有内容，滚动位置天然不动
@@ -536,16 +549,12 @@ public class MainActivity extends Activity {
             } else {
                 log.setText(full);   // 首次或缓冲区已截断，整体替换
             }
-            if (follow) {
-                logScroll.post(() -> {
-                    View child = logScroll.getChildAt(0);
-                    int max = child == null ? 0 : Math.max(0, child.getHeight() - logScroll.getHeight());
-                    logScroll.scrollTo(0, max);
-                    updatingLog = false;
-                });
-            } else {
+            logScroll.post(() -> {
+                View child = logScroll.getChildAt(0);
+                int max = child == null ? 0 : Math.max(0, child.getHeight() - logScroll.getHeight());
+                logScroll.scrollTo(0, follow ? max : Math.min(oldY, max));
                 updatingLog = false;
-            }
+            });
         }
     }
 }

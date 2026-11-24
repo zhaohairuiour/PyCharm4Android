@@ -19,8 +19,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 极简 RFB(RFB 3.8) 客户端：只使用 Raw / CopyRect 编码。
- * 本地回环 + 不做压缩，省掉编码/解码开销，直接把 BGRA 像素写进 int[] 帧缓冲。
+ * 极简 RFB(RFB 3.8) 客户端：使用 Raw / CopyRect / RichCursor 编码。
+ * 本地回环 + 不做压缩，省掉编码/解码开销，直接把 BGRA 像素写进 int[] 帧缓冲；
+ * RichCursor 让服务端把 X11 的真实指针形状发过来，客户端不再自绘大箭头。
  */
 public final class VncClient implements Runnable {
 
@@ -48,6 +49,7 @@ public final class VncClient implements Runnable {
             new ArrayBlockingQueue<Runnable>(16), new ThreadPoolExecutor.DiscardOldestPolicy());
     private volatile int[] cursorPix;
     private volatile int cursorW, cursorH, cursorHotX, cursorHotY;
+    private volatile boolean cursorHidden = false;
     private final Object fbLock = new Object();
     private volatile boolean running = false;
 
@@ -67,6 +69,7 @@ public final class VncClient implements Runnable {
     public int cursorHeight() { return cursorH; }
     public int cursorHotX() { return cursorHotX; }
     public int cursorHotY() { return cursorHotY; }
+    public boolean cursorHidden() { return cursorHidden; }
 
     @Override
     public void run() {
@@ -171,14 +174,15 @@ public final class VncClient implements Runnable {
 
         socket.setSoTimeout(0);   // 握手完成，恢复阻塞读
 
-        // SetEncodings: Raw(0), CopyRect(1)
+        // SetEncodings: Raw(0), CopyRect(1), RichCursor(-239)
+        // RichCursor 的 hotspot 在矩形头 x/y，w/h 是光标尺寸，负载只有 w*h 个像素；
+        // 请求服务端真实光标，避免本地箭头随缩放变大挡住桌面。
         out.writeByte(2);
         out.writeByte(0);
-        out.writeShort(2);
+        out.writeShort(3);
         out.writeInt(0);          // Raw
         out.writeInt(1);          // CopyRect
-        // 不请求 Cursor 伪编码：x11vnc 的 Cursor 帧格式与实现不一致会造成协议错位，
-        // 指针用 VncView 内的箭头兜底绘制。
+        out.writeInt(-239);       // RichCursor
         out.flush();
     }
 
@@ -229,8 +233,8 @@ public final class VncClient implements Runnable {
             if (enc == 0) {
                 readRaw(x, y, w, h);
                 rects.add(new int[]{x, y, w, h});
-            } else if (enc == -239) {          // Cursor 伪编码
-                readCursor();
+            } else if (enc == -239) {          // RichCursor：矩形头携带 hotspot 与尺寸
+                readCursor(w, h, x, y);
                 rects.add(new int[]{0, 0, 0, 0});   // 仅触发一次重绘
             } else if (enc == 1) {
                 int sx = in.readUnsignedShort();
@@ -244,12 +248,14 @@ public final class VncClient implements Runnable {
         if (!rects.isEmpty()) listener.onUpdate(rects);
     }
 
-    private void readCursor() throws IOException {
-        int w = in.readUnsignedShort();
-        int h = in.readUnsignedShort();
-        int hx = in.readUnsignedShort();
-        int hy = in.readUnsignedShort();
-        if (w <= 0 || h <= 0 || w > 256 || h > 256) throw new IOException("Cursor 尺寸异常 " + w + "x" + h);
+    private void readCursor(int w, int h, int hx, int hy) throws IOException {
+        if (w <= 0 || h <= 0) {
+            cursorPix = null;
+            cursorW = cursorH = 0;
+            cursorHidden = true;   // 服务端明确发送空光标：隐藏指针
+            return;
+        }
+        if (w > 256 || h > 256) throw new IOException("Cursor 尺寸异常 " + w + "x" + h);
         int bytes = w * h * 4;
         byte[] buf = new byte[bytes];
         in.readFully(buf);
@@ -262,6 +268,7 @@ public final class VncClient implements Runnable {
         }
         cursorW = w; cursorH = h; cursorHotX = hx; cursorHotY = hy;
         cursorPix = pix;
+        cursorHidden = false;
     }
 
     private void readRaw(int x, int y, int w, int h) throws IOException {

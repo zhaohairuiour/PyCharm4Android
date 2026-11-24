@@ -395,7 +395,7 @@
                     android:lineSpacingExtra="2dp"
                     android:padding="12dp"
                     android:textColor="#FF9FE8FF"
-                    android:textIsSelectable="true"
+                    android:textIsSelectable="false"
                     android:textSize="10sp" />
             </ScrollView>
 

@@ -239,7 +239,7 @@ public class VncView extends View {
 
     /** 优先用服务端 Cursor 伪编码的形状；收不到就画内置箭头，保证能看见指针 */
     private void drawCursor(Canvas canvas) {
-        if (client == null || !hasPointer) return;
+        if (client == null || !hasPointer || client.cursorHidden()) return;
         float s = fitScale() * zoom;
         if (s <= 0f) return;
 
@@ -255,16 +255,20 @@ public class VncView extends View {
                 }
             }
             if (cursorBitmap != null) {
-                float x = dst.left + curX * s - client.cursorHotX() * s;
-                float y = dst.top + curY * s - client.cursorHotY() * s;
-                cursorDst.set(x, y, x + cw * s, y + ch * s);
+                // 服务端光标按 RFB 像素尺寸绘制；限制最大 24dp，避免异常大光标挡住桌面
+                float drawW = cw * s, drawH = ch * s;
+                float cap = getResources().getDisplayMetrics().density * 24f;
+                float k = Math.max(drawW, drawH) > cap ? cap / Math.max(drawW, drawH) : 1f;
+                float x = dst.left + curX * s - client.cursorHotX() * s * k;
+                float y = dst.top + curY * s - client.cursorHotY() * s * k;
+                cursorDst.set(x, y, x + drawW * k, y + drawH * k);
                 canvas.drawBitmap(cursorBitmap, null, cursorDst, paint);
                 return;
             }
         }
 
         float px = dst.left + curX * s, py = dst.top + curY * s;
-        float k = getResources().getDisplayMetrics().density;
+        float k = getResources().getDisplayMetrics().density * 0.8f;
         arrow.reset();
         arrow.moveTo(px, py);
         arrow.lineTo(px + 13 * k, py + 9 * k);
@@ -274,6 +278,8 @@ public class VncView extends View {
         arrow.lineTo(px + 5 * k, py + 12 * k);
         arrow.lineTo(px + 1 * k, py + 15 * k);
         arrow.close();
+        arrowFill.setAlpha(210);
+        arrowEdge.setAlpha(180);
         canvas.drawPath(arrow, arrowFill);
         canvas.drawPath(arrow, arrowEdge);
     }

@@ -1,6 +1,9 @@
 package com.pycharm4android;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -9,7 +12,6 @@ import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.method.ScrollingMovementMethod;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -19,6 +21,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.RandomAccessFile;
@@ -53,6 +56,8 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
     private final long startedAt = System.currentTimeMillis();
     private String shownLog = "";
     private String shownStage = "";
+    private boolean logStickBottom = true;   // 用户滚到底部才自动跟随
+    private boolean applyingLog = false;
     private Runnable logPump;
     private ExecutorService logIo;
     private volatile boolean logReadPending = false;
@@ -147,13 +152,27 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         logText.setTextColor(0xFFCFD3D8);
         logText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
         logText.setTypeface(Typeface.MONOSPACE);
-        logText.setTextIsSelectable(true);
-        logText.setMovementMethod(new ScrollingMovementMethod());
+        // 文本选择会抢走纵向拖拽手势；日志优先滚动，长按复制全文
+        logText.setTextIsSelectable(false);
+        logText.setOnLongClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(ClipData.newPlainText("PyCharm 日志", logText.getText()));
+                Toast.makeText(this, "日志已复制", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        });
         logScroll.addView(logText);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         lp.topMargin = dp(6);
         logPanel.addView(logScroll, lp);
+        logScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (applyingLog) return;
+            View child = logScroll.getChildAt(0);
+            if (child == null) return;
+            logStickBottom = child.getHeight() - (y + logScroll.getHeight()) <= dp(24);
+        });
 
         FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -437,9 +456,11 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         });
     }
 
-    /** 主线程只做 TextView 增量追加，整体替换只在日志回绕/换段时发生 */
+    /** 主线程只做 TextView 增量追加；用户上滑后停止自动跟随，避免每 1.5 s 被拉回底部 */
     private void applyLog(String body) {
         if (body.equals(shownLog)) return;
+        int oldY = logScroll.getScrollY();
+        applyingLog = true;
         if (!shownLog.isEmpty() && body.startsWith(shownLog)) {
             logText.append(body.substring(shownLog.length()));
         } else {
@@ -449,7 +470,8 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
         logScroll.post(() -> {
             View child = logScroll.getChildAt(0);
             int max = child == null ? 0 : Math.max(0, child.getHeight() - logScroll.getHeight());
-            logScroll.scrollTo(0, max);
+            logScroll.scrollTo(0, logStickBottom ? max : Math.min(oldY, max));
+            applyingLog = false;
         });
     }
 
