@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -52,15 +53,27 @@ public class MainActivity extends Activity {
             }
             return true;
         });
-        // 日志区自己滚动，别被外层 ScrollView 抢走手势
+        // 日志区自己滚动，别被外层 ScrollView 抢走手势；抬手后恢复父容器拦截，页面其他区域仍可滚动
         log.setOnTouchListener((v, e) -> {
-            logScroll.requestDisallowInterceptTouchEvent(true);
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                logScroll.requestDisallowInterceptTouchEvent(true);
+            }
             return false;
         });
         logScroll.setOnTouchListener((v, e) -> {
-            v.getParent().requestDisallowInterceptTouchEvent(true);
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                    break;
+            }
             return false;
         });
+        logScroll.setVerticalScrollBarEnabled(true);
+        logScroll.setScrollbarFadingEnabled(false);
         logScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
             if (updatingLog) return;
             View child = logScroll.getChildAt(0);

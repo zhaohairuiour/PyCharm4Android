@@ -148,6 +148,8 @@ public class DisplayActivity extends Activity implements VncClient.Listener {
 
         logScroll = new ScrollView(this);
         logScroll.setFillViewport(true);
+        logScroll.setVerticalScrollBarEnabled(true);
+        logScroll.setScrollbarFadingEnabled(false);
         logText = new TextView(this);
         logText.setTextColor(0xFFCFD3D8);
         logText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);

@@ -385,6 +385,8 @@
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_log"
                 android:padding="1dp"
+                android:fadeScrollbars="false"
+                android:scrollbarStyle="insideInset"
                 android:scrollbars="vertical">
 
                 <TextView

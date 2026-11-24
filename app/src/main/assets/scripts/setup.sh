@@ -46,24 +46,33 @@ exit 0
 EOF
 chmod +x /usr/sbin/policy-rc.d /sbin/runlevel /usr/sbin/update-gsfontmap
 
+echo "[3/4] 修复上次中断的 dpkg 状态"
+rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock
+# 上一次安装/apt 被强杀时，dpkg 会停在半配置状态；必须先收敛，否则后续 apt 固定 exit 100
+dpkg --configure -a || echo "[warn] dpkg --configure -a 返回 $?"
+apt-get -f install -y || echo "[warn] apt-get -f install 返回 $?"
+
 echo "[3/4] apt-get update"
 apt-get update -y
 
 echo "[4/4] 安装 X11 / VNC / 运行库"
-apt-get install -y --no-install-recommends \
-  ca-certificates locales \
-  xvfb x11vnc novnc websockify openbox xterm \
-  dbus-x11 fontconfig fonts-dejavu-core fonts-wqy-microhei \
-  libnss3 libxkbcommon0 libxkbcommon-x11-0 \
-  libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
-  libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xfixes0 \
-  libxcb-cursor0 libx11-xcb1 \
-  libgbm1 libfreetype6 libfontconfig1 libxrender1 \
-  libxi6 libxtst6 libxrandr2 libxext6 libxfixes3 \
-  libxt6t64 libsm6 libice6 \
-  libglib2.0-0t64 libasound2t64 \
-  procps psmisc
-apt-get -f install -y || true
+DEPS="ca-certificates locales xvfb x11vnc novnc websockify openbox xterm \
+dbus-x11 fontconfig fonts-dejavu-core fonts-wqy-microhei \
+libnss3 libxkbcommon0 libxkbcommon-x11-0 \
+libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xfixes0 \
+libxcb-cursor0 libx11-xcb1 \
+libgbm1 libfreetype6 libfontconfig1 libxrender1 \
+libxi6 libxtst6 libxrandr2 libxext6 libxfixes3 \
+libxt6t64 libsm6 libice6 \
+libglib2.0-0t64 libasound2t64 \
+procps psmisc"
+if ! apt-get install -y --no-install-recommends $DEPS; then
+  echo "[warn] 首次 apt 安装失败，收敛 dpkg 后重试一次"
+  dpkg --configure -a || true
+  apt-get -f install -y || true
+  apt-get install -y --no-install-recommends $DEPS
+fi
 
 echo "[4/4] 生成中文 locale 缓存"
 sed -i 's/^# *\(C.UTF-8 UTF-8\)/\1/' /etc/locale.gen || true

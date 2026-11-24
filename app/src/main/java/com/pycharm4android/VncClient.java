@@ -259,12 +259,18 @@ public final class VncClient implements Runnable {
         int bytes = w * h * 4;
         byte[] buf = new byte[bytes];
         in.readFully(buf);
+        // RichCursor 的负载是像素数据 + 1 位透明掩码；漏读掩码会让后续 RFB 消息整体错位。
+        int maskRow = (w + 7) / 8;
+        byte[] mask = new byte[maskRow * h];
+        in.readFully(mask);
         int[] pix = new int[w * h];
-        for (int i = 0; i < pix.length; i++) {
-            int b = buf[i * 4] & 0xFF, g = buf[i * 4 + 1] & 0xFF, r = buf[i * 4 + 2] & 0xFF;
-            int a = buf[i * 4 + 3] & 0xFF;
-            if (a == 0) a = (r | g | b) != 0 ? 0xFF : 0x00;
-            pix[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int i = y * w + x;
+                int b = buf[i * 4] & 0xFF, g = buf[i * 4 + 1] & 0xFF, r = buf[i * 4 + 2] & 0xFF;
+                boolean visible = (mask[y * maskRow + (x >> 3)] & (0x80 >> (x & 7))) != 0;
+                pix[i] = visible ? (0xFF000000 | (r << 16) | (g << 8) | b) : 0;
+            }
         }
         cursorW = w; cursorH = h; cursorHotX = hx; cursorHotY = hy;
         cursorPix = pix;

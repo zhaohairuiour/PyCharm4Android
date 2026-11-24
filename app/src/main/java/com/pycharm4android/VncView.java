@@ -255,9 +255,9 @@ public class VncView extends View {
                 }
             }
             if (cursorBitmap != null) {
-                // 服务端光标按 RFB 像素尺寸绘制；限制最大 24dp，避免异常大光标挡住桌面
+                // 服务端光标按 RFB 像素尺寸绘制；限制最大 16dp，避免异常大光标挡住桌面
                 float drawW = cw * s, drawH = ch * s;
-                float cap = getResources().getDisplayMetrics().density * 24f;
+                float cap = getResources().getDisplayMetrics().density * 16f;
                 float k = Math.max(drawW, drawH) > cap ? cap / Math.max(drawW, drawH) : 1f;
                 float x = dst.left + curX * s - client.cursorHotX() * s * k;
                 float y = dst.top + curY * s - client.cursorHotY() * s * k;
@@ -268,7 +268,8 @@ public class VncView extends View {
         }
 
         float px = dst.left + curX * s, py = dst.top + curY * s;
-        float k = getResources().getDisplayMetrics().density * 0.8f;
+        // 没有服务端光标时才画小箭头；不能让它随屏幕密度变成大块遮挡
+        float k = getResources().getDisplayMetrics().density * 0.55f;
         arrow.reset();
         arrow.moveTo(px, py);
         arrow.lineTo(px + 13 * k, py + 9 * k);
