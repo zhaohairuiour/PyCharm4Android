@@ -7,9 +7,9 @@
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#)
 [![Arch](https://img.shields.io/badge/arch-arm64-00E5FF?style=flat-square)](#)
 [![Root](https://img.shields.io/badge/root-not%20required-41E3A0?style=flat-square)](#)
-[![UI](https://img.shields.io/badge/UI-v1.14.2-3D7BFF?style=flat-square)](#)
+[![UI](https://img.shields.io/badge/UI-v1.14.3-3D7BFF?style=flat-square)](#)
 
-[介绍页](https://zhaohairuiour.github.io/PyCharm4Android/) · [下载最新版](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.2-arm64.apk) · [全部版本](#全部版本) · [构建](#构建)
+[介绍页](https://zhaohairuiour.github.io/PyCharm4Android/) · [下载最新版](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.3-arm64.apk) · [全部版本](#全部版本) · [构建](#构建)
 
 </div>
 
@@ -26,6 +26,14 @@
 IDE 本体是 JetBrains 官方 Linux arm64 发行版，安装时按需下载，不塞进 APK。社区版 2022.3–2025.3、专业版 2022.3–2026.3.0.1 可选。
 
 ![PyCharm 欢迎页](docs/screenshots/screenshot-welcome.png)
+
+## v1.14.3 更新：堆内存改为输入框
+
+- 堆内存设置改为数值输入框（256–6144 MB）+ 快捷档位，不再只有固定 6 档；输入框自动聚焦并弹出数字键盘；
+- 应用后回读 `runtime/vmoptions.txt` 并在 Toast 中显示实际写入的 `-Xmx`，主界面按钮同步显示当前值；
+- 堆参数改由 `PYCHARM_VM_OPTIONS` 文件承载，只托管 `-Xmx` 与容器相关 `-D`；`ReservedCodeCacheSize` / `MaxMetaspaceSize` 沿用官方默认，避免重复 `-XX` 让较小值覆盖官方值；
+- PyCharm 运行中修改后可直接确认“立即重启”，启动脚本重新拉起 IDE 即读取新堆值；
+- `run-ide.sh` 启动时把实际 `-Xmx` 写进日志，便于确认生效。
 
 ## v1.14.2 更新：日志滚动、VNC 光标与 apt 中断修复
 
@@ -122,6 +130,7 @@ APK
 
 | 版本 | 日期 | 体积 | SHA-256 | APK |
 |---|---|---|---|---|
+| v1.14.3 | 2026-11-27 | 293 KB | [`2cd55c6a4110…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.3-arm64.apk) |
 | v1.14.2 | 2026-11-24 | 289 KB | [`9633d0814382…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.2-arm64.apk) |
 | v1.14.1 | 2026-11-24 | 289 KB | [`d460b4dbe92c…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.1-arm64.apk) |
 | v1.14.0 | 2026-11-22 | 289 KB | [`55db48815070…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.0-arm64.apk) |
@@ -157,11 +166,11 @@ APK
 
 所有 APK 也放在 [`docs/apk/`](docs/apk/)，GitHub Pages 直接提供下载。覆盖安装保留容器与已下载的 IDE。
 
-> 国内下载建议使用 [GitProxy 镜像](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.2-arm64.apk)；介绍页下载按钮默认走 GitProxy，也可切换 GitHub 直链。全版本文件与 SHA-256 均一致。
+> 国内下载建议使用 [GitProxy 镜像](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.3-arm64.apk)；介绍页下载按钮默认走 GitProxy，也可切换 GitHub 直链。全版本文件与 SHA-256 均一致。
 
 ## 安装
 
-1. 下载 `PyCharm4Android-1.14.2-arm64.apk`，允许“安装未知应用”；
+1. 下载 `PyCharm4Android-1.14.3-arm64.apk`，允许“安装未知应用”；
 2. 打开应用点「开始安装」：自动下载 Ubuntu base（约 30 MB）、校验 SHA-256、解包、apt 安装 X11/VNC，再下载 PyCharm（750 MB–1.3 GB）；
 3. 点「启动 PyCharm」进入桌面。首次 JVM 冷启动 1–3 分钟，之后固定连接 `127.0.0.1:5901`。
 

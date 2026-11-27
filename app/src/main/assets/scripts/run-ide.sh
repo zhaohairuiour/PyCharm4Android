@@ -25,7 +25,7 @@ pkill -x openbox >/dev/null 2>&1 || true
 sleep 1
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 say() { echo "[run-ide +$(( $(date +%s) - START ))s] $*" | tee -a "$LOG"; }
-say "run-ide.sh v1.14.2 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
+say "run-ide.sh v1.14.3 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
 
 cleanup() {
   pkill -f "pycharm" >/dev/null 2>&1 || true
@@ -137,7 +137,7 @@ fi
 # PYCHARM_VM_OPTIONS 覆盖安装目录默认文件和用户配置副本，避免“改了没生效”。
 if [ -f /opt/host/vmoptions.txt ]; then
   export PYCHARM_VM_OPTIONS=/opt/host/vmoptions.txt
-  say "JVM 参数：PYCHARM_VM_OPTIONS=/opt/host/vmoptions.txt"
+  say "JVM 参数：PYCHARM_VM_OPTIONS=/opt/host/vmoptions.txt $(grep -m1 '^-Xmx' /opt/host/vmoptions.txt 2>/dev/null || echo '(未找到 -Xmx)')"
 fi
 
 # 旧版本安装可能保留无执行位的原生 launcher，启动前补齐权限

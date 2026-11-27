@@ -18,6 +18,15 @@ public final class HeapConfig {
         return Io.readAll(f).contains("-Xmx" + Prefs.heapMb(c) + "m");
     }
 
+    /** 读回 runtime/vmoptions.txt 中托管的 -Xmx，界面用于确认实际写入值 */
+    public static String runtimeXmx(Context c) {
+        for (String line : Io.readAll(new File(Dirs.runtime(c), "vmoptions.txt")).split("\n")) {
+            String t = line.trim();
+            if (t.matches("-Xmx[0-9]+[mMgG]")) return t;
+        }
+        return "";
+    }
+
     /**
      * 直接改写 rootfs 内的 pycharm64.vmoptions。
      * 先删除上一版托管块与 1.9.7 及更早追加的无标记参数，再写入当前托管块；
@@ -63,9 +72,9 @@ public final class HeapConfig {
     private static String buildVmoptions(Context c) {
         StringBuilder vm = new StringBuilder();
         vm.append(START).append('\n');
+        // 只托管 -Xmx 与容器相关的 -D；ReservedCodeCacheSize / MaxMetaspaceSize
+        // 沿用官方默认文件，避免重复 -XX 参数让后写的较小值覆盖官方值
         vm.append("-Xmx").append(Prefs.heapMb(c)).append("m\n");
-        vm.append("-XX:ReservedCodeCacheSize=256m\n");
-        vm.append("-XX:MaxMetaspaceSize=512m\n");
         vm.append("-Dide.browser.jcef.enabled=false\n");
         vm.append("-Didea.initially.ask.config=false\n");
         vm.append("-Didea.filewatcher.disabled=true\n");

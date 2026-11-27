@@ -11,8 +11,16 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -165,66 +173,202 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    /** 堆内存入口：选择 JVM -Xmx，已安装时直接改写 pycharm64.vmoptions */
+    /** 堆内存入口：数值输入框 + 快捷档位；写入 runtime/vmoptions.txt 与安装目录默认文件 */
     private void chooseHeap() {
-        if (SetupState.running) {
-            Toast.makeText(this, "安装进行中，完成后再调整堆内存", Toast.LENGTH_SHORT).show();
-            return;
+        try {
+            showHeapDialog();
+        } catch (Throwable t) {
+            LogBus.append("[设置] 打开堆内存设置失败：" + t);
+            Toast.makeText(this, "打开堆内存设置失败：" + t, Toast.LENGTH_LONG).show();
         }
-        int cur = Prefs.heapMb(this);
-        int[] opts = Const.HEAP_OPTIONS;
-        String[] hints = {
-                "4 GB 内存 / 轻量项目",
-                "6 GB 内存 / 推荐",
-                "默认 / 6–8 GB 内存",
-                "8 GB 内存 / 中大型项目",
-                "12 GB 内存 / 大型项目",
-                "16 GB 内存 / 极限",
-        };
-        String[] labels = new String[opts.length];
-        int checked = 0;
-        for (int i = 0; i < opts.length; i++) {
-            labels[i] = opts[i] + " MB · " + hints[i] + (opts[i] == cur ? " · 当前" : "");
-            if (opts[i] == HeapConfig.nearestOption(cur)) checked = i;
-        }
-        final int[] sel = {checked};
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("堆内存（JVM -Xmx）")
-                .setMessage("堆越大，索引、重构与大项目越流畅，但会占用更多物理内存。\n"
-                        + "修改后重启 PyCharm 生效；当前 " + cur + " MB。")
-                .setSingleChoiceItems(labels, checked, (d, which) -> sel[0] = which)
-                .setPositiveButton("应用", (d, which) -> applyHeap(opts[sel[0]]))
-                .setNegativeButton("取消", null)
-                .show();
     }
 
-    private void applyHeap(int mb) {
+    private void showHeapDialog() {
+        final int cur = Prefs.heapMb(this);
+        long totalMb = 0;
+        ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (am != null) {
+            ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+            am.getMemoryInfo(mi);
+            totalMb = mi.totalMem / 1048576L;
+        }
+        final int recommend = totalMb > 0
+                ? (int) Math.min(4096L, Math.max(512L, (totalMb * 3) / 5))
+                : 2048;
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(6), dp(22), dp(2));
+
+        TextView tip = new TextView(this);
+        tip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        tip.setTextColor(0xFF9FB4D2);
+        tip.setLineSpacing(dp(2), 1f);
+        tip.setText("设备内存 " + (totalMb > 0 ? (totalMb / 1024L) + " GB" : "未知")
+                + "，建议不超过 " + recommend + " MB。\n"
+                + "可输入 256–6144 MB；当前 " + cur + " MB，写入后重启 PyCharm 生效。"
+                + (SetupState.running ? "\n安装进行中：本次只记录参数，安装完成后自动生效。" : ""));
+        box.addView(tip, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rp.topMargin = dp(10);
+        box.addView(row, rp);
+
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setText(String.valueOf(cur));
+        input.setSelection(input.getText().length());
+        input.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        input.setGravity(Gravity.CENTER);
+        input.setTextColor(0xFFE6F6FF);
+        row.addView(input, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView unit = new TextView(this);
+        unit.setText("MB");
+        unit.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        unit.setTextColor(0xFF9FB4D2);
+        LinearLayout.LayoutParams up = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        up.leftMargin = dp(8);
+        row.addView(unit, up);
+
+        HorizontalScrollView hs = new HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        int[] presets = {512, 768, 1024, 1536, 2048, 3072, 4096};
+        for (int v : presets) {
+            TextView chip = heapChip(v);
+            chip.setOnClickListener(x -> {
+                input.setText(String.valueOf(v));
+                input.setSelection(input.getText().length());
+            });
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            cp.rightMargin = dp(6);
+            chips.addView(chip, cp);
+        }
+        hs.addView(chips);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hp.topMargin = dp(8);
+        box.addView(hs, hp);
+
+        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle("堆内存（JVM -Xmx）")
+                .setView(box)
+                .setPositiveButton("应用", null)
+                .setNegativeButton("取消", null)
+                .create();
+        dlg.setOnShowListener(x -> {
+            android.view.Window w = dlg.getWindow();
+            if (w != null) w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            dlg.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                int mb = parseMb(input.getText().toString());
+                if (mb < 256 || mb > Const.HEAP_MAX_MB) {
+                    Toast.makeText(this, "请输入 256–" + Const.HEAP_MAX_MB + " 之间的整数（MB）",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                dlg.dismiss();
+                applyHeap(mb, recommend);
+            });
+            input.requestFocus();
+            input.post(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+            });
+        });
+        dlg.show();
+    }
+
+    /** 快捷档位胶囊，点击后填入输入框 */
+    private TextView heapChip(int mb) {
+        TextView tv = new TextView(this);
+        tv.setText(String.valueOf(mb));
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        tv.setTextColor(0xFF7DE9FF);
+        tv.setPadding(dp(12), dp(6), dp(12), dp(6));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xFF1A1D22);
+        bg.setCornerRadius(dp(16));
+        bg.setStroke(dp(1), 0xFF2F4A5A);
+        tv.setBackground(bg);
+        return tv;
+    }
+
+    private int parseMb(String s) {
+        if (s == null) return 0;
+        String t = s.trim();
+        if (t.isEmpty()) return 0;
+        try {
+            return Integer.parseInt(t);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private void applyHeap(int mb, int recommend) {
         Prefs.setHeap(this, mb);
+        heap.setText("堆 " + mb + " MB");
         final boolean runtimeOk = HeapConfig.writeVmoptions(this);
-        LogBus.append("[设置] JVM 堆上限 -> " + mb + " MB");
+        final String xmx = HeapConfig.runtimeXmx(this);
+        LogBus.append("[设置] JVM 堆上限 -> " + mb + " MB，运行参数 " + (runtimeOk ? xmx : "写入失败"));
         if (!runtimeOk) {
             Toast.makeText(this, "写入 JVM 参数失败，请检查应用存储空间", Toast.LENGTH_LONG).show();
             refresh();
             return;
         }
         if (!Dirs.ideReadyMark(this).exists()) {
-            Toast.makeText(this, "堆已设为 " + mb + " MB，将在安装 PyCharm 时生效", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "已写入 " + xmx + "；安装 PyCharm 后首次启动即生效", Toast.LENGTH_LONG).show();
             refresh();
             return;
         }
+        final boolean installing = SetupState.running;
         final boolean running = IdeService.RUNNING;
-        Toast.makeText(this, "正在写入 vmoptions…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "正在写入 " + xmx + "…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
-            final boolean rootfsOk = HeapConfig.applyToRootfs(MainActivity.this);
-            final String msg = rootfsOk
-                    ? "堆已设为 " + mb + " MB" + (running ? "，重启 PyCharm 后生效" : "，下次启动生效")
-                    : "堆已设为 " + mb + " MB；已写入运行参数，重启 PyCharm 后生效";
-            LogBus.append("[设置] " + msg);
+            final boolean rootfsOk = !installing && HeapConfig.applyToRootfs(MainActivity.this);
+            String msg = "堆已设为 " + mb + " MB（" + xmx + "）";
+            if (installing) msg += "；安装完成后生效";
+            else if (rootfsOk) msg += running ? "，重启 PyCharm 后生效" : "，下次启动生效";
+            else msg += "；运行参数已写入，由 PYCHARM_VM_OPTIONS 覆盖安装目录配置";
+            if (mb > recommend) msg += "\n注意：超过建议值 " + recommend + " MB，可能被系统回收";
+            final String fMsg = msg;
+            LogBus.append("[设置] " + fMsg.replace("\n", " "));
             runOnUiThread(() -> {
-                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                Toast.makeText(this, fMsg, Toast.LENGTH_LONG).show();
                 refresh();
+                if (running && !installing) promptRestart(mb);
             });
         }, "heap").start();
+    }
+
+    /** 运行中的 JVM 不会重读 -Xmx；询问是否立即杀掉 IDE 让启动脚本重新拉起 */
+    private void promptRestart(int mb) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("重启 PyCharm？")
+                .setMessage("已写入 -Xmx" + mb + "m。JVM 只在启动时读取堆参数，需重启 PyCharm 才能生效。")
+                .setPositiveButton("立即重启", (d, w) -> {
+                    new Thread(() -> {
+                        try {
+                            int code = Proot.run(this, "pkill -f pycharm || true");
+                            LogBus.append("[设置] 已请求重启 PyCharm，exit=" + code);
+                        } catch (Throwable t) {
+                            LogBus.append("[设置] 重启 PyCharm 失败：" + t);
+                        }
+                    }, "heap-restart").start();
+                    Toast.makeText(this, "正在重启 PyCharm，稍后重新连接桌面", Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("稍后手动重启", null)
+                .show();
     }
 
     /** 版本管理入口：选择并安装 / 清理下载包 / 卸载已装 PyCharm */
@@ -527,6 +671,8 @@ public class MainActivity extends Activity {
                     + "\nPyCharm：" + Versions.pretty(installedIde)
                     + " · 目标：" + (Prefs.ideVersion(this).isEmpty() ? "最新社区版" : Versions.pretty(Prefs.ideVersion(this)))
                     + "\n存储可用 " + Downloader.fmt(new android.os.StatFs(getFilesDir().getAbsolutePath()).getAvailableBytes());
+            String heapLabel = "堆 " + Prefs.heapMb(this) + " MB";
+            if (!heapLabel.contentEquals(heap.getText())) heap.setText(heapLabel);
             if (!d.equals(lastDetailText)) { detail.setText(d); lastDetailText = d; }
         }
 
@@ -537,12 +683,12 @@ public class MainActivity extends Activity {
             display.setEnabled(ready && !running);
             stop.setEnabled(ideRunning);
             version.setEnabled(!running);
-            heap.setEnabled(!running);
+            heap.setEnabled(true);
             install.setAlpha(running ? 0.45f : 1f);
             launch.setAlpha(ready && !running ? 1f : 0.45f);
             display.setAlpha(ready && !running ? 1f : 0.45f);
             stop.setAlpha(ideRunning ? 1f : 0.45f);
-            heap.setAlpha(running ? 0.45f : 1f);
+            heap.setAlpha(1f);
             lastReady = ready;
             lastRunning = running;
             lastIdeRunning = ideRunning;

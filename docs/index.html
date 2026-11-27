@@ -312,12 +312,12 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
     <h1>把桌面版<br><span class="accent">PyCharm</span> 装进手机</h1>
     <p class="lead">不是远程开发，也不是阉割客户端。APK 内置一套 Ubuntu arm64 用户态，proot 免 root 运行 JetBrains 官方 PyCharm，Xvfb 出图、x11vnc 推流，自研原生 RFB 客户端直接绘帧。</p>
     <div class="cta">
-      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.2-arm64.apk" download>下载最新版 v1.14.2 ↓</a>
+      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.3-arm64.apk" download>下载最新版 v1.14.3 ↓</a>
       <a id="ghlink2" class="btn secondary" href="https://github.com/" target="_blank" rel="noopener">查看源码</a>
     </div>
-    <div class="meta"><span>APK 289 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 9633d0814382…</span><span>镜像源 · GitProxy</span></div>
+    <div class="meta"><span>APK 293 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 2cd55c6a4110…</span><span>镜像源 · GitProxy</span></div>
     <div class="stats">
-      <div class="stat"><b>32</b><span>个历史版本</span></div>
+      <div class="stat"><b>33</b><span>个历史版本</span></div>
       <div class="stat"><b>0</b><span>root 权限要求</span></div>
       <div class="stat"><b>Raw</b><span>原生 RFB 渲染</span></div>
       <div class="stat"><b>5901</b><span>固定 VNC 端口</span></div>
@@ -405,7 +405,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 </div></section>
 
 <section id="versions"><div class="wrap">
-  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 32 个版本</h2></div><p>从 1.0.0 到 1.14.2，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
+  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 33 个版本</h2></div><p>从 1.0.0 到 1.14.3，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
   <div class="lines">
     <span class="label">下载线路</span>
     <button class="line-switch active" type="button" data-line="mirror">GitProxy 镜像</button>
@@ -417,7 +417,14 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
       <thead><tr><th>版本</th><th>构建日期</th><th>体积</th><th>SHA-256</th><th></th></tr></thead>
       <tbody>
         <tr>
-          <td><span class="ver">v1.14.2</span> <span class="tag">LATEST</span></td>
+          <td><span class="ver">v1.14.3</span> <span class="tag">LATEST</span></td>
+          <td class="muted">2026-11-27</td>
+          <td class="muted">293 KB</td>
+          <td><code data-sha="2cd55c6a4110adb903e5ca0c90a902709892de31c5d6178c14c3d9a8d6c20882">2cd55c6a4110…</code></td>
+          <td><a class="dl" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.3-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.14.2</span></td>
           <td class="muted">2026-11-24</td>
           <td class="muted">289 KB</td>
           <td><code data-sha="9633d081438213b5940f64504af7db445a15eeaf56fe626db17d6a29494ee002">9633d0814382…</code></td>
@@ -666,7 +673,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 <section id="faq"><div class="wrap">
   <div class="section-head"><div><div class="eyebrow">// FAQ</div><h2>常见问题</h2></div><p>关于性能、账号与兼容性的高频问题。</p></div>
   <details><summary>需要 root 吗？</summary><p>不需要。使用 proot 用户态模拟，未解锁 Bootloader 的零售机也能安装。代价是 ptrace 带来的系统调用开销，启动阶段最明显。</p></details>
-  <details><summary>堆内存怎么调？</summary><p>主界面点「堆内存」，可选 512 / 768 / 1024 / 1536 / 2048 / 3072 MB。已安装时直接改写容器内 <code>pycharm64.vmoptions</code>，重启 PyCharm 生效；安装过程中则自动写入所选档位，重复调整不会叠加多个 <code>-Xmx</code>。</p></details>
+  <details><summary>堆内存怎么调？</summary><p>主界面点「堆内存」，在输入框直接填 256–6144 MB（数字键盘会自动弹出），也可点 512 / 768 / 1024 / 1536 / 2048 / 3072 / 4096 快捷档位。参数写入 <code>/opt/host/vmoptions.txt</code> 并由 <code>PYCHARM_VM_OPTIONS</code> 生效；运行中修改可点「立即重启」让 IDE 重新读取 <code>-Xmx</code>。</p></details>
   <details><summary>为什么强制横屏？</summary><p>PyCharm 桌面 UI 按 16:10 设计，竖屏下编辑器与工具窗口会被压得很窄。v1.9.9 起主界面和显示页都锁定 <code>sensorLandscape</code>，可左右翻转，但不会回到竖屏。</p></details>
   <details><summary>为什么首次启动很慢？</summary><p>要等 Xvfb 就绪、JBR 冷启动、PyCharm 索引初始化。7 GB 内存设备建议只开一个项目，社区版比专业版轻。</p></details>
   <details><summary>专业版需要账号吗？</summary><p>需要。专业版首次启动会要求登录 JetBrains 账号激活，含 30 天试用；社区版免费，无需账号。</p></details>
@@ -674,7 +681,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <details><summary>解包或卸载时会卡住吗？</summary><p>v1.11.0 起解包会显示压缩包字节、总量、百分比和当前文件；卸载先统计文件数/体积，再按删除字节推进。大目录首次扫描需要几秒，属于正常现象，系统会持续更新进度。</p></details>
   <details><summary>安装依赖报“dpkg was interrupted”怎么办？</summary><p>v1.14.2 的安装脚本会在 apt 前清理 dpkg/apt 锁并执行 <code>dpkg --configure -a</code> 与 <code>apt-get -f install</code>；首次安装失败还会自动收敛 dpkg 后重试一次。覆盖安装后重新点“开始安装”即可。</p></details>
   <details><summary>日志面板无法滚动/为什么有个大鼠标？</summary><p>v1.14.2 起日志区独立处理纵向手势，抬手后恢复外层页面滚动；RichCursor 补读透明掩码，修正旧版漏读造成的指针矩形异常与 RFB 消息错位，光标限制 16dp。</p></details>
-  <details><summary>为什么修改堆内存后没生效？</summary><p>v1.14.0 起堆参数写入 <code>/opt/host/vmoptions.txt</code>，启动脚本用 <code>PYCHARM_VM_OPTIONS</code> 覆盖安装目录和用户配置；修改后必须停止并重新启动 PyCharm，JVM 才读取新 <code>-Xmx</code>。旧版只改安装目录默认文件，遇到用户配置副本会被覆盖。</p></details>
+  <details><summary>为什么修改堆内存后没生效？</summary><p>v1.14.3 起可在输入框填任意 256–6144 MB，并回读显示实际写入的 <code>-Xmx</code>；v1.14.0 起堆参数写入 <code>/opt/host/vmoptions.txt</code>，启动脚本用 <code>PYCHARM_VM_OPTIONS</code> 覆盖安装目录和用户配置；修改后必须停止并重新启动 PyCharm，JVM 才读取新 <code>-Xmx</code>。旧版只改安装目录默认文件，遇到用户配置副本会被覆盖。</p></details>
   <details><summary>v1.13.0 性能优化做了什么？</summary><p>RFB 输入/输出加缓冲，协议小字段不再逐字节走 socket；Raw 像素用 little-endian <code>IntBuffer</code> 批量读入；<code>ide.log</code> 的读取与拼接移到后台单线程；<code>TarGz</code> 普通路径不再逐条 canonical，目录创建结果缓存，无执行位文件跳过冗余 chmod；rootfs 已可执行时不再重复 chmod。</p></details>
   <details><summary>v1.12.0 性能优化做了什么？</summary><p>rootfs 校验结果缓存，避免每次启动遍历 <code>usr/bin</code>；解包复用 64 KB I/O 缓冲；主界面空闲轮询降到 2 s；显示页日志面板隐藏后停止日志读取；VNC 更新按帧合并，CopyRect 原地拷贝。</p></details>
   <details><summary>为什么端口固定 5901？</summary><p>display :1 的传统 VNC 端口。服务端和客户端都写死 5901，避免端口扫描带来的连接抖动。</p></details>
