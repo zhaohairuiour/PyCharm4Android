@@ -312,12 +312,12 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
     <h1>把桌面版<br><span class="accent">PyCharm</span> 装进手机</h1>
     <p class="lead">不是远程开发，也不是阉割客户端。APK 内置一套 Ubuntu arm64 用户态，proot 免 root 运行 JetBrains 官方 PyCharm，Xvfb 出图、x11vnc 推流，自研原生 RFB 客户端直接绘帧。</p>
     <div class="cta">
-      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.5-arm64.apk" download>下载最新版 v1.14.5 ↓</a>
+      <a class="btn primary" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.6-arm64.apk" download>下载最新版 v1.14.6 ↓</a>
       <a id="ghlink2" class="btn secondary" href="https://github.com/" target="_blank" rel="noopener">查看源码</a>
     </div>
-    <div class="meta"><span>APK 298 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 c0de9fdc4b14…</span><span>镜像源 · GitProxy</span></div>
+    <div class="meta"><span>APK 298 KB</span><span>Android 8.0+ / arm64</span><span>SHA-256 32c0bd186555…</span><span>镜像源 · GitProxy</span></div>
     <div class="stats">
-      <div class="stat"><b>35</b><span>个历史版本</span></div>
+      <div class="stat"><b>36</b><span>个历史版本</span></div>
       <div class="stat"><b>0</b><span>root 权限要求</span></div>
       <div class="stat"><b>Hextile</b><span>原生 RFB 渲染</span></div>
       <div class="stat"><b>5901</b><span>固定 VNC 端口</span></div>
@@ -405,7 +405,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 </div></section>
 
 <section id="versions"><div class="wrap">
-  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 35 个版本</h2></div><p>从 1.0.0 到 1.14.5，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
+  <div class="section-head"><div><div class="eyebrow">// BUILD ARCHIVE</div><h2>全部 36 个版本</h2></div><p>从 1.0.0 到 1.14.6，每个 APK 均可直接下载；覆盖安装保留容器与已下载的 IDE。</p></div>
   <div class="lines">
     <span class="label">下载线路</span>
     <button class="line-switch active" type="button" data-line="mirror">GitProxy 镜像</button>
@@ -417,7 +417,14 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
       <thead><tr><th>版本</th><th>构建日期</th><th>体积</th><th>SHA-256</th><th></th></tr></thead>
       <tbody>
         <tr>
-          <td><span class="ver">v1.14.5</span> <span class="tag">LATEST</span></td>
+          <td><span class="ver">v1.14.6</span> <span class="tag">LATEST</span></td>
+          <td class="muted">2026-11-28</td>
+          <td class="muted">298 KB</td>
+          <td><code data-sha="32c0bd18655587f69a5111bbc6beb02fef3f7e03b10352a08abda25fb689f590">32c0bd186555…</code></td>
+          <td><a class="dl" href="https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.6-arm64.apk" download>下载 ↓</a></td>
+        </tr>
+        <tr>
+          <td><span class="ver">v1.14.5</span></td>
           <td class="muted">2026-11-28</td>
           <td class="muted">298 KB</td>
           <td><code data-sha="c0de9fdc4b143fde49986a1edd69848af0c664bbbcc4b54e80f8e463fea832ca">c0de9fdc4b14…</code></td>
@@ -698,6 +705,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <details><summary>为什么修改堆内存后没生效？</summary><p>v1.14.3 起可在输入框填任意 256–6144 MB，并回读显示实际写入的 <code>-Xmx</code>；v1.14.0 起堆参数写入 <code>/opt/host/vmoptions.txt</code>，启动脚本用 <code>PYCHARM_VM_OPTIONS</code> 覆盖安装目录和用户配置；修改后必须停止并重新启动 PyCharm，JVM 才读取新 <code>-Xmx</code>。旧版只改安装目录默认文件，遇到用户配置副本会被覆盖。</p></details>
   <details><summary>v1.13.0 性能优化做了什么？</summary><p>RFB 输入/输出加缓冲，协议小字段不再逐字节走 socket；Raw 像素用 little-endian <code>IntBuffer</code> 批量读入；<code>ide.log</code> 的读取与拼接移到后台单线程；<code>TarGz</code> 普通路径不再逐条 canonical，目录创建结果缓存，无执行位文件跳过冗余 chmod；rootfs 已可执行时不再重复 chmod。</p></details>
   <details><summary>v1.12.0 性能优化做了什么？</summary><p>rootfs 校验结果缓存，避免每次启动遍历 <code>usr/bin</code>；解包复用 64 KB I/O 缓冲；主界面空闲轮询降到 2 s；显示页日志面板隐藏后停止日志读取；VNC 更新按帧合并，CopyRect 原地拷贝。</p></details>
+  <details><summary>弹出 “External file changes sync might be slow” 怎么办？</summary><p>这是 PyCharm 的文件监听告警：proot 无法把 inotify 路径映射回容器路径，原生 fsnotifier 不可用；v1.14.6 已同时关闭 Eel watcher，正常不会再弹。代价是终端或 git 改动的文件不会自动刷新，执行 <code>File → Reload All from Disk</code> 即可；IDE 内编辑保存不受影响。</p></details>
   <details><summary>鼠标点不动 / 双指怎么滚动？</summary><p>v1.14.5 修复了指针事件被覆盖导致的点击失效：按下与抬起现在严格按序送达。双指捏合仍是缩放，双指上下滑动改为滚轮（每约 24 dp 一格，上滑向下滚、下滑向上滚），横向位移仍用于平移；双指轻点仍是右键。若点击仍无反应，先确认应用内版本号为 1.14.5。</p></details>
   <details><summary>VNC 里滚动或打字还是卡怎么办？</summary><p>v1.14.4 起客户端优先用 Hextile，x11vnc 启用 XDamage 只传变化瓦片：1280×800 全屏首帧从约 4 MB 降到约 4 KB，滚动流量约为原来的 1/78。若仍卡，先确认日志里有 <code>[vnc] 服务端采用 Hextile 编码</code>；不要同时开多个 VNC 客户端（x11vnc 会为每个连接重复编码）；缩放调回 100%。proot + Xvfb 是软件渲染，全屏索引等重动画仍会比本地 IDE 慢。</p></details>
   <details><summary>为什么端口固定 5901？</summary><p>display :1 的传统 VNC 端口。服务端和客户端都写死 5901，避免端口扫描带来的连接抖动。</p></details>

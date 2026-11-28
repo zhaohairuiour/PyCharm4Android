@@ -25,7 +25,7 @@ pkill -x openbox >/dev/null 2>&1 || true
 sleep 1
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 say() { echo "[run-ide +$(( $(date +%s) - START ))s] $*" | tee -a "$LOG"; }
-say "run-ide.sh v1.14.5 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
+say "run-ide.sh v1.14.6 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
 
 cleanup() {
   pkill -f "pycharm" >/dev/null 2>&1 || true
@@ -135,6 +135,25 @@ if [ -f "$IDE_DIR/bin/idea.properties" ]; then
     || echo 'ide.no.platform.update=true' >>"$IDE_DIR/bin/idea.properties"
   say "已禁用原生 file watcher（容器内 inotify 不可靠）"
 fi
+
+# EelFileWatcher 会把本地路径全部上报为 manual watch root；原生 watcher 关闭后
+# 这些 root 无人接管，PyCharm 就误报“External file changes sync might be slow”。
+# 本项目不使用远程开发，直接关闭 Eel watcher，避免误报和 manual root 刷新。
+CFG_ROOT="$HOME/.config/JetBrains"
+DATA_DIR=$(sed -n 's/.*"dataDirectoryName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$IDE_DIR/product-info.json" 2>/dev/null | head -1)
+if [ -z "$DATA_DIR" ]; then
+  DATA_DIR=$(basename "$(ls -d "$CFG_ROOT"/PyCharm* 2>/dev/null | head -1)" 2>/dev/null)
+fi
+[ -z "$DATA_DIR" ] && DATA_DIR="PyCharm2024.3"
+CFG_DIR="$CFG_ROOT/$DATA_DIR"
+mkdir -p "$CFG_DIR" 2>/dev/null || true
+EARLY="$CFG_DIR/early-access-registry.txt"
+if [ -f "$EARLY" ]; then
+  awk 'NR % 2 == 1 { k = $0; next } { if (k != "use.eel.file.watcher") { print k; print } }' "$EARLY" > "$EARLY.tmp" 2>/dev/null \
+    && mv "$EARLY.tmp" "$EARLY" 2>/dev/null || rm -f "$EARLY.tmp" 2>/dev/null
+fi
+printf 'use.eel.file.watcher\nfalse\n' >> "$EARLY" 2>/dev/null \
+  && say "已关闭 Eel 文件监听（避免 proot 下误报同步缓慢）"
 
 # 堆内存等 JVM 参数由 App 写入 runtime/vmoptions.txt；用 JetBrains 支持的
 # PYCHARM_VM_OPTIONS 覆盖安装目录默认文件和用户配置副本，避免“改了没生效”。

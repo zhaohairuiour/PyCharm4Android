@@ -11,8 +11,8 @@ android {
         minSdk = 26
         // 必须 <=28：Android 10+ 仅允许 targetSdk<29 的应用执行私有目录中的二进制（proot / rootfs 内程序）
         targetSdk = 28
-        versionCode = 35
-        versionName = "1.14.5"
+        versionCode = 36
+        versionName = "1.14.6"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
