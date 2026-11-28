@@ -19,8 +19,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 极简 RFB(RFB 3.8) 客户端：使用 Raw / CopyRect / RichCursor 编码。
- * 本地回环 + 不做压缩，省掉编码/解码开销，直接把 BGRA 像素写进 int[] 帧缓冲；
+ * 极简 RFB(RFB 3.8) 客户端：使用 Hextile / CopyRect / Raw / RichCursor 编码。
+ * 本地回环下优先 Hextile（只传变化瓦片），Raw 兜底；解码后直接把 BGRA 像素写进 int[] 帧缓冲；
  * RichCursor 让服务端把 X11 的真实指针形状发过来，客户端不再自绘大箭头。
  */
 public final class VncClient implements Runnable {
@@ -44,9 +44,17 @@ public final class VncClient implements Runnable {
     private byte[] rawBuf = new byte[4];
     private int[] rawInts = new int[1];
     private IntBuffer rawIntBuffer;
+    private final HextileDecoder hextile = new HextileDecoder();
+    private volatile boolean loggedHextile = false;
     // 输入事件不能直接在 UI 线程写 socket（会抛 NetworkOnMainThreadException），统一排队由单线程发送
     private final ThreadPoolExecutor sender = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<Runnable>(16), new ThreadPoolExecutor.DiscardOldestPolicy());
+            new ArrayBlockingQueue<Runnable>(256), new ThreadPoolExecutor.DiscardOldestPolicy());
+    // 指针事件合并：触摸移动可达 120 Hz，逐条 write+flush 只会把 socket 刷满；
+    // 只保留最新坐标，由独立指针线程尽快写一次。独立线程也避免键盘突发事件
+    // 把发送队列塞满后连带丢掉指针任务、导致点击无响应。
+    private final Object ptrSignal = new Object();
+    private volatile int ptrX, ptrY, ptrMask;
+    private volatile boolean ptrPending = false;
     private volatile int[] cursorPix;
     private volatile int cursorW, cursorH, cursorHotX, cursorHotY;
     private volatile boolean cursorHidden = false;
@@ -57,6 +65,9 @@ public final class VncClient implements Runnable {
         this.host = host;
         this.port = port;
         this.listener = l;
+        Thread t = new Thread(this::pointerLoop, "vnc-pointer");
+        t.setDaemon(true);
+        t.start();
     }
 
     public boolean isRunning() { return running; }
@@ -174,14 +185,16 @@ public final class VncClient implements Runnable {
 
         socket.setSoTimeout(0);   // 握手完成，恢复阻塞读
 
-        // SetEncodings: Raw(0), CopyRect(1), RichCursor(-239)
-        // RichCursor 的 hotspot 在矩形头 x/y，w/h 是光标尺寸，负载只有 w*h 个像素；
-        // 请求服务端真实光标，避免本地箭头随缩放变大挡住桌面。
+        // SetEncodings: Hextile(5) > CopyRect(1) > Raw(0) > RichCursor(-239)
+        // Hextile 用「背景色 + 子矩形」描述 16×16 瓦片，IDE 大面积纯色场景下数据量
+        // 通常只有 Raw 的 1/20~1/100，手机端解包与 socket 拷贝压力随之下降；
+        // Raw 保留为首帧/兜底编码，RichCursor 让服务端发真实光标形状。
         out.writeByte(2);
         out.writeByte(0);
-        out.writeShort(3);
-        out.writeInt(0);          // Raw
+        out.writeShort(4);
+        out.writeInt(5);          // Hextile
         out.writeInt(1);          // CopyRect
+        out.writeInt(0);          // Raw
         out.writeInt(-239);       // RichCursor
         out.flush();
     }
@@ -232,6 +245,15 @@ public final class VncClient implements Runnable {
             int enc = in.readInt();
             if (enc == 0) {
                 readRaw(x, y, w, h);
+                rects.add(new int[]{x, y, w, h});
+            } else if (enc == 5) {             // Hextile
+                synchronized (fbLock) {
+                    hextile.decode(in, fb, width, height, x, y, w, h);
+                }
+                if (!loggedHextile) {
+                    loggedHextile = true;
+                    LogBus.append("[vnc] 服务端采用 Hextile 编码（16×16 瓦片子矩形）");
+                }
                 rects.add(new int[]{x, y, w, h});
             } else if (enc == -239) {          // RichCursor：矩形头携带 hotspot 与尺寸
                 readCursor(w, h, x, y);
@@ -327,8 +349,28 @@ public final class VncClient implements Runnable {
 
     /** 鼠标事件：buttonMask 1=左键 2=中键 4=右键 8/16=滚轮 */
     public void pointer(int x, int y, int mask) {
-        final int fx = clamp(x, width), fy = clamp(y, height);
-        sender.execute(() -> writePointer(fx, fy, mask));
+        ptrX = clamp(x, width);
+        ptrY = clamp(y, height);
+        ptrMask = mask;
+        synchronized (ptrSignal) {
+            ptrPending = true;
+            ptrSignal.notifyAll();
+        }
+    }
+
+    private void pointerLoop() {
+        while (true) {
+            int x, y, mask;
+            synchronized (ptrSignal) {
+                while (!ptrPending && running) {
+                    try { ptrSignal.wait(1000); } catch (InterruptedException e) { return; }
+                }
+                if (!running) return;
+                ptrPending = false;
+                x = ptrX; y = ptrY; mask = ptrMask;
+            }
+            writePointer(x, y, mask);
+        }
     }
 
     private void writePointer(int x, int y, int mask) {
@@ -375,6 +417,7 @@ public final class VncClient implements Runnable {
 
     public void close() {
         running = false;
+        synchronized (ptrSignal) { ptrSignal.notifyAll(); }
         sender.shutdownNow();
         try { if (socket != null) socket.close(); } catch (IOException ignored) {}
         socket = null;

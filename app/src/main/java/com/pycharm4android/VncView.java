@@ -35,7 +35,8 @@ public class VncView extends View {
     private Bitmap bitmap;
     private int fbW, fbH;
 
-    private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+    // 去掉 DITHER：VNC 是整帧位图缩放，抖动对观感无益，只增加每帧采样开销
+    private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint arrowFill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint arrowEdge = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path arrow = new Path();
@@ -51,7 +52,11 @@ public class VncView extends View {
     // VNC 线程按帧合并更新，避免每个 RFB 消息都向主线程投递一个 Runnable
     private final Object pendingLock = new Object();
     private final ArrayList<int[]> pendingRects = new ArrayList<>();
+    private final ArrayList<int[]> batchRects = new ArrayList<>();
     private boolean updateScheduled = false;
+    private long lastFlushUptime = 0L;
+    /** 合并窗口：把服务端一串小矩形攒到一帧再画，避免每条 RFB 消息都触发一次全屏重绘 */
+    private static final long FRAME_INTERVAL_MS = 16L;
     private final Runnable flushUpdates = this::flushUpdates;
     private boolean hasPointer = false;
     private boolean rightClickNext = false;
@@ -155,7 +160,10 @@ public class VncView extends View {
             if (updateScheduled) return;
             updateScheduled = true;
         }
-        if (!post(flushUpdates)) {
+        long now = SystemClock.uptimeMillis();
+        long delay = FRAME_INTERVAL_MS - (now - lastFlushUptime);
+        if (delay < 0L) delay = 0L;
+        if (!postDelayed(flushUpdates, delay)) {
             synchronized (pendingLock) {
                 pendingRects.clear();
                 updateScheduled = false;
@@ -170,9 +178,12 @@ public class VncView extends View {
                 updateScheduled = false;
                 return;
             }
-            batch = new ArrayList<>(pendingRects);
+            batchRects.clear();
+            batchRects.addAll(pendingRects);
             pendingRects.clear();
+            batch = batchRects;
             updateScheduled = false;
+            lastFlushUptime = SystemClock.uptimeMillis();
         }
         applyUpdate(batch);
     }
@@ -181,21 +192,26 @@ public class VncView extends View {
         if (bitmap == null || client == null) return;
         int[] fb = client.framebuffer();
         if (fb == null || fb.length < fbW * fbH) return;
+        boolean changed = false;
+        boolean cursorOnly = false;
         synchronized (client.lock()) {
             for (int[] r : rects) {
                 int x = r[0], y = r[1], w = r[2], h = r[3];
+                if (w == 0 && h == 0) { cursorOnly = true; continue; }   // Cursor 伪编码的哨兵矩形
                 if (x < 0 || y < 0 || w <= 0 || h <= 0) continue;
+                if (x >= fbW || y >= fbH) continue;
                 if (x + w > fbW) w = fbW - x;
                 if (y + h > fbH) h = fbH - y;
                 if (w <= 0 || h <= 0) continue;
                 try {
                     bitmap.setPixels(fb, y * fbW + x, fbW, x, y, w, h);
+                    changed = true;
                 } catch (Throwable t) {
                     LogBus.append("[vnc] 绘制矩形失败 x=" + x + " y=" + y + " w=" + w + " h=" + h + "：" + t);
                 }
             }
         }
-        postInvalidate();
+        if (changed || cursorOnly) postInvalidate();
     }
 
     public void setZoom(float z) {

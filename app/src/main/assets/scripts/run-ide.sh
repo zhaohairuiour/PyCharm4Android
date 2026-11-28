@@ -25,7 +25,7 @@ pkill -x openbox >/dev/null 2>&1 || true
 sleep 1
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 say() { echo "[run-ide +$(( $(date +%s) - START ))s] $*" | tee -a "$LOG"; }
-say "run-ide.sh v1.14.3 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
+say "run-ide.sh v1.14.4 · 固定 VNC 端口 5901 · IDE 退出后自动重启"
 
 cleanup() {
   pkill -f "pycharm" >/dev/null 2>&1 || true
@@ -75,8 +75,11 @@ start_vnc() {
   local label="$1"; shift
   say "x11vnc 启动【$label】port=$VNC_PORT"
   echo "--- attempt: $label ---" >>"$VL"
+  # XDamage：只抓真正变化的区域。旧参数 -noxdamage 会让 x11vnc 每 10 ms 全屏
+  # XGetImage + memcmp（1280×800 约 4 MB/次），既抢 CPU 又拖慢出帧；
+  # 实测滚动场景 5 s 内 XDamage 75 帧 / 无 Damage 仅 22 帧。
   x11vnc -display :1 -rfbport "$VNC_PORT" -noshm -forever -shared -nopw \
-         -repeat -wait 10 -defer 10 "$@" >>"$VL" 2>&1 &
+         -repeat -wait 8 -defer 5 -xdamage "$@" >>"$VL" 2>&1 &
   local pid=$!
   local i
   for i in $(seq 1 60); do
@@ -107,8 +110,8 @@ start_vnc() {
 }
 
 say "x11vnc 版本：$(x11vnc -version 2>&1 | head -1)"
-start_vnc "localhost" -localhost -noxdamage \
-  || start_vnc "allow 127.0.0.1" -allow 127.0.0.1 -noxdamage \
+start_vnc "localhost" -localhost \
+  || start_vnc "allow 127.0.0.1" -allow 127.0.0.1 \
   || { say "VNC_FAIL：两种参数均未确认监听，见 /root/vnc.log"; tail -n 30 "$VL" >>"$LOG"; }
 
 # 深色 Windows 风格 openbox 主题 + 窗口规则（标题栏 30 px 按钮、Alt+F9/F10 快捷键）
