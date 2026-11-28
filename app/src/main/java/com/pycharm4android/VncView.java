@@ -69,9 +69,12 @@ public class VncView extends View {
     private long downTime = 0L;
     private final long longPressTimeout = 500L;
 
-    // 双指手势
+    // 双指手势：捏合 = 缩放；双指纵向滑动 = 滚轮（横向分量仍用于平移）
     private float pinchStartDist = 0f, pinchStartZoom = 1f, pinchStartPanX = 0f, pinchStartPanY = 0f;
     private float pinchStartCx = 0f, pinchStartCy = 0f;
+    private static final int TWO_UNDECIDED = 0, TWO_PINCH = 1, TWO_WHEEL = 2;
+    private int twoMode = TWO_UNDECIDED;
+    private float twoLastCy = 0f, wheelAccum = 0f, twoSlopPx = 0f, wheelStepPx = 0f;
 
     // 双指轻点 = 右键（长按之外的第二条可靠路径）
     private boolean twoTapCandidate = false;
@@ -123,6 +126,9 @@ public class VncView extends View {
         arrowEdge.setColor(Color.BLACK);
         arrowEdge.setStyle(Paint.Style.STROKE);
         arrowEdge.setStrokeWidth(2f);
+        float density = c.getResources().getDisplayMetrics().density;
+        twoSlopPx = 14f * density;
+        wheelStepPx = 24f * density;   // 每滑动约 24 dp 发一格滚轮
     }
 
     public void setClient(VncClient c) { this.client = c; }
@@ -351,6 +357,9 @@ public class VncView extends View {
                     pinchStartPanY = panY;
                     pinchStartCx = (e.getX(0) + e.getX(1)) / 2f;
                     pinchStartCy = (e.getY(0) + e.getY(1)) / 2f;
+                    twoMode = TWO_UNDECIDED;
+                    twoLastCy = pinchStartCy;
+                    wheelAccum = 0f;
                     twoTapCandidate = true;
                     twoTapStart = SystemClock.uptimeMillis();
                     twoTapX = pinchStartCx;
@@ -362,11 +371,39 @@ public class VncView extends View {
             case MotionEvent.ACTION_MOVE: {
                 if (e.getPointerCount() >= 2 && pinchStartDist > 0) {
                     float d = dist(e);
-                    zoom = Math.max(0.5f, Math.min(6f, pinchStartZoom * (d / pinchStartDist)));
                     float cx = (e.getX(0) + e.getX(1)) / 2f;
                     float cy = (e.getY(0) + e.getY(1)) / 2f;
-                    panX = pinchStartPanX + (cx - pinchStartCx);
-                    panY = pinchStartPanY + (cy - pinchStartCy);
+                    float dDist = Math.abs(d - pinchStartDist);
+                    float dVert = Math.abs(cy - pinchStartCy);
+                    if (twoMode == TWO_UNDECIDED) {
+                        // 明确两指间距变化才进入缩放；否则纵向位移按滚轮处理
+                        if (dDist > twoSlopPx && dDist > dVert) twoMode = TWO_PINCH;
+                        else if (dVert > twoSlopPx) twoMode = TWO_WHEEL;
+                    }
+                    if (twoMode == TWO_PINCH) {
+                        zoom = Math.max(0.5f, Math.min(6f, pinchStartZoom * (d / pinchStartDist)));
+                        panX = pinchStartPanX + (cx - pinchStartCx);
+                        panY = pinchStartPanY + (cy - pinchStartCy);
+                    } else if (twoMode == TWO_WHEEL) {
+                        panX = pinchStartPanX + (cx - pinchStartCx);
+                        curX = clampX((int) ((cx - dst.left) / s));
+                        curY = clampY((int) ((cy - dst.top) / s));
+                        float dy = cy - twoLastCy;
+                        twoLastCy = cy;
+                        wheelAccum += dy;
+                        while (wheelAccum >= wheelStepPx) {      // 手指下滑 = 滚轮向上
+                            client.pointer(curX, curY, 8);
+                            client.pointer(curX, curY, 0);
+                            wheelAccum -= wheelStepPx;
+                        }
+                        while (wheelAccum <= -wheelStepPx) {     // 手指上滑 = 滚轮向下
+                            client.pointer(curX, curY, 16);
+                            client.pointer(curX, curY, 0);
+                            wheelAccum += wheelStepPx;
+                        }
+                    } else {
+                        panX = pinchStartPanX + (cx - pinchStartCx);   // 纯横向两指平移
+                    }
                     if (twoTapCandidate) {
                         twoTapMax = Math.max(twoTapMax, (float) Math.hypot(cx - twoTapX, cy - twoTapY));
                         if (twoTapMax > 24f * getResources().getDisplayMetrics().density) twoTapCandidate = false;
@@ -396,7 +433,9 @@ public class VncView extends View {
             }
             case MotionEvent.ACTION_POINTER_UP: {
                 pinchStartDist = 0;
-                if (twoTapCandidate && e.getPointerCount() >= 2) {
+                twoMode = TWO_UNDECIDED;
+                wheelAccum = 0f;
+                if (twoTapCandidate && e.getPointerCount() == 2) {
                     long held = SystemClock.uptimeMillis() - twoTapStart;
                     if (held <= 400 && twoTapMax <= 24f * getResources().getDisplayMetrics().density) {
                         float mx = (e.getX(0) + e.getX(1)) / 2f;
@@ -436,6 +475,8 @@ public class VncView extends View {
                 downPending = false;
                 longArmed = false;
                 pinchStartDist = 0;
+                twoMode = TWO_UNDECIDED;
+                wheelAccum = 0f;
                 return true;
             }
             case MotionEvent.ACTION_CANCEL: {
@@ -445,6 +486,8 @@ public class VncView extends View {
                 downPending = false;
                 longArmed = false;
                 pinchStartDist = 0;
+                twoMode = TWO_UNDECIDED;
+                wheelAccum = 0f;
                 return true;
             }
         }

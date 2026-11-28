@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -49,12 +50,12 @@ public final class VncClient implements Runnable {
     // 输入事件不能直接在 UI 线程写 socket（会抛 NetworkOnMainThreadException），统一排队由单线程发送
     private final ThreadPoolExecutor sender = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<Runnable>(256), new ThreadPoolExecutor.DiscardOldestPolicy());
-    // 指针事件合并：触摸移动可达 120 Hz，逐条 write+flush 只会把 socket 刷满；
-    // 只保留最新坐标，由独立指针线程尽快写一次。独立线程也避免键盘突发事件
-    // 把发送队列塞满后连带丢掉指针任务、导致点击无响应。
-    private final Object ptrSignal = new Object();
-    private volatile int ptrX, ptrY, ptrMask;
-    private volatile boolean ptrPending = false;
+    // 指针事件队列：按下/抬起必须逐条送达，不能只保留“最新状态”，否则
+    // 轻点的 press(mask=1) 会被紧随其后的 release(mask=0) 覆盖，表现为点哪都没反应。
+    // 队列只合并「同一按键状态下」的连续移动，按键变化严格保序。
+    private final Object ptrLock = new Object();
+    private final ArrayDeque<int[]> ptrQueue = new ArrayDeque<>();
+    private volatile boolean closed = false;
     private volatile int[] cursorPix;
     private volatile int cursorW, cursorH, cursorHotX, cursorHotY;
     private volatile boolean cursorHidden = false;
@@ -349,25 +350,31 @@ public final class VncClient implements Runnable {
 
     /** 鼠标事件：buttonMask 1=左键 2=中键 4=右键 8/16=滚轮 */
     public void pointer(int x, int y, int mask) {
-        ptrX = clamp(x, width);
-        ptrY = clamp(y, height);
-        ptrMask = mask;
-        synchronized (ptrSignal) {
-            ptrPending = true;
-            ptrSignal.notifyAll();
+        if (width <= 0 || height <= 0) return;
+        synchronized (ptrLock) {
+            if (ptrQueue.size() >= 512) ptrQueue.pollFirst();   // 极端保护；正常交互远达不到
+            ptrQueue.addLast(new int[]{clamp(x, width), clamp(y, height), mask});
+            ptrLock.notifyAll();
         }
     }
 
     private void pointerLoop() {
         while (true) {
             int x, y, mask;
-            synchronized (ptrSignal) {
-                while (!ptrPending && running) {
-                    try { ptrSignal.wait(1000); } catch (InterruptedException e) { return; }
+            synchronized (ptrLock) {
+                while (ptrQueue.isEmpty() && !closed) {
+                    try { ptrLock.wait(1000); } catch (InterruptedException e) { return; }
                 }
-                if (!running) return;
-                ptrPending = false;
-                x = ptrX; y = ptrY; mask = ptrMask;
+                if (closed) return;
+                int[] e = ptrQueue.pollFirst();
+                x = e[0]; y = e[1]; mask = e[2];
+                // 连续移动（mask 相同）只发最后一次坐标；press/release 各自独立成包
+                while (!ptrQueue.isEmpty()) {
+                    int[] next = ptrQueue.peekFirst();
+                    if (next[2] != mask) break;
+                    ptrQueue.pollFirst();
+                    x = next[0]; y = next[1];
+                }
             }
             writePointer(x, y, mask);
         }
@@ -416,8 +423,9 @@ public final class VncClient implements Runnable {
     }
 
     public void close() {
+        closed = true;
         running = false;
-        synchronized (ptrSignal) { ptrSignal.notifyAll(); }
+        synchronized (ptrLock) { ptrLock.notifyAll(); }
         sender.shutdownNow();
         try { if (socket != null) socket.close(); } catch (IOException ignored) {}
         socket = null;

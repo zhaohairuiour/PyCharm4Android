@@ -7,9 +7,9 @@
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#)
 [![Arch](https://img.shields.io/badge/arch-arm64-00E5FF?style=flat-square)](#)
 [![Root](https://img.shields.io/badge/root-not%20required-41E3A0?style=flat-square)](#)
-[![UI](https://img.shields.io/badge/UI-v1.14.4-3D7BFF?style=flat-square)](#)
+[![UI](https://img.shields.io/badge/UI-v1.14.5-3D7BFF?style=flat-square)](#)
 
-[介绍页](https://zhaohairuiour.github.io/PyCharm4Android/) · [下载最新版](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.4-arm64.apk) · [全部版本](#全部版本) · [构建](#构建)
+[介绍页](https://zhaohairuiour.github.io/PyCharm4Android/) · [下载最新版](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.5-arm64.apk) · [全部版本](#全部版本) · [构建](#构建)
 
 </div>
 
@@ -21,18 +21,26 @@
 
 - **Linux 用户态**：Ubuntu 24.04 arm64 rootfs，Termux 版 proot 免 root 运行；
 - **X 显示**：Xvfb 虚拟屏 + openbox 窗口管理 + x11vnc 固定 5901 端口；
-- **渲染与输入**：自研原生 RFB 客户端直接写 `Bitmap`，单指移动/轻点/长按拖拽、双指缩放、双指右键、自绘软键盘注入 keysym。
+- **渲染与输入**：自研原生 RFB 客户端直接写 `Bitmap`，单指移动/轻点/长按拖拽、双指缩放、双指上下滑=滚轮、双指轻点=右键、自绘软键盘注入 keysym。
 
 IDE 本体是 JetBrains 官方 Linux arm64 发行版，安装时按需下载，不塞进 APK。社区版 2022.3–2025.3、专业版 2022.3–2026.3.0.1 可选。
 
 ![PyCharm 欢迎页](docs/screenshots/screenshot-welcome.png)
+
+## v1.14.5 更新：修复点击失效，双指上下滑动改为滚轮
+
+- 修复 1.14.4 引入的点击回归：指针线程原先只保留最新状态，同一 UI 帧内的 `press(mask=1)` 会被随后的 `release(mask=0)` 覆盖，表现为“点屏幕任何位置都没反应”。改为有序事件队列：按下/抬起/右键/滚轮严格按序成包，仅合并 mask 相同的连续移动；
+- 指针线程改用 `closed` 标志退出：连接建立前 `running=false` 不再让线程提前结束，消除“完全没有指针”的另一条路径；
+- 双指手势重新分工：捏合 = 缩放，双指上下滑 = 滚轮（每约 24 dp 一格；上滑滚轮向下、下滑滚轮向上），横向位移仍用于平移；400 ms 内双指轻点仍触发右键；
+- 键盘发送队列 16 → 256，降低快速输入丢键概率；
+- 新增模拟 RFB 服务端的指针顺序测试：同一帧两次轻点、滚轮上下、右键的报文序列 `1,0,1,0,8,0,16,0,4,0` 全部按序到达。
 
 ## v1.14.4 更新：VNC 改走 Hextile，滚动和首帧更快
 
 - RFB 客户端优先协商 Hextile（16×16 瓦片，背景色 + 单色/彩色子矩形），Raw 降为兜底；新增纯 Java `HextileDecoder`，按 RFC 6143 处理 subencoding 位、bg/fg 跨瓦片继承和非整瓦片边界；
 - 1280×800 静态全屏首帧：Raw 4,096,115 B → Hextile 4,164 B（约 1/983）；滚动 3 s：63.1 MB → 0.81 MB（约 1/78），单帧解码 1.4~1.8 ms → 0.41~0.44 ms（本机 Xvfb + x11vnc 实测，帧缓冲 SHA-256 与 Raw 完全一致）；
 - x11vnc 启用 XDamage（移除 `-noxdamage`），只抓真正变化的区域；`-wait 10 -defer 10` 调为 `-wait 8 -defer 5`。滚动 5 s 实测：XDamage 出帧 75，无 Damage 仅 22（全屏 XGetImage + memcmp 跟不上）；
-- `VncView` 以 16 ms 窗口合并 RFB 矩形、跳过空更新、去掉 `DITHER_FLAG`；触摸指针事件只保留最新坐标，避免 120 Hz 移动刷爆 socket；
+- `VncView` 以 16 ms 窗口合并 RFB 矩形、跳过空更新、去掉 `DITHER_FLAG`（指针事件的合并策略在 1.14.5 改为有序队列）；
 - 连接后日志打印 `[vnc] 服务端采用 Hextile 编码`，便于确认优化生效。
 
 ## v1.14.3 更新：堆内存改为输入框
@@ -138,6 +146,7 @@ APK
 
 | 版本 | 日期 | 体积 | SHA-256 | APK |
 |---|---|---|---|---|
+| v1.14.5 | 2026-11-28 | 298 KB | [`c0de9fdc4b14…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.5-arm64.apk) |
 | v1.14.4 | 2026-11-28 | 293 KB | [`8b608fd30304…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.4-arm64.apk) |
 | v1.14.3 | 2026-11-27 | 293 KB | [`2cd55c6a4110…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.3-arm64.apk) |
 | v1.14.2 | 2026-11-24 | 289 KB | [`9633d0814382…`] | [下载](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.2-arm64.apk) |
@@ -175,11 +184,11 @@ APK
 
 所有 APK 也放在 [`docs/apk/`](docs/apk/)，GitHub Pages 直接提供下载。覆盖安装保留容器与已下载的 IDE。
 
-> 国内下载建议使用 [GitProxy 镜像](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.4-arm64.apk)；介绍页下载按钮默认走 GitProxy，也可切换 GitHub 直链。全版本文件与 SHA-256 均一致。
+> 国内下载建议使用 [GitProxy 镜像](https://api.gitproxy.dev/raw.githubusercontent.com/zhaohairuiour/PyCharm4Android/main/docs/apk/PyCharm4Android-1.14.5-arm64.apk)；介绍页下载按钮默认走 GitProxy，也可切换 GitHub 直链。全版本文件与 SHA-256 均一致。
 
 ## 安装
 
-1. 下载 `PyCharm4Android-1.14.4-arm64.apk`，允许“安装未知应用”；
+1. 下载 `PyCharm4Android-1.14.5-arm64.apk`，允许“安装未知应用”；
 2. 打开应用点「开始安装」：自动下载 Ubuntu base（约 30 MB）、校验 SHA-256、解包、apt 安装 X11/VNC，再下载 PyCharm（750 MB–1.3 GB）；
 3. 点「启动 PyCharm」进入桌面。首次 JVM 冷启动 1–3 分钟，之后固定连接 `127.0.0.1:5901`。
 
